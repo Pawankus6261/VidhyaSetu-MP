@@ -54,10 +54,62 @@ export function evaluateScholarships(profile) {
       reasons.push(`किराए के मकान का अनुबंध एवं प्रमाण-पत्र आवश्यक`);
     }
 
+    const catPassed = scholarship.categories.includes(category);
+    const genderPassed = !scholarship.genders || scholarship.genders.includes('ALL') || scholarship.genders.includes(gender);
+    const incomePassed = annualIncome <= scholarship.maxIncome;
+    const marksPassed = twelfthPercentage >= scholarship.minPercentage;
+    const sambalPassed = !scholarship.requiresSambal || !!hasSambalCard;
+    const rentPassed = !scholarship.requiresRentedRoom || !!isRentingRoom;
+
+    const rulesEvaluated = [
+      {
+        rule: 'सामाजिक वर्ग (Category)',
+        passed: catPassed,
+        reason: catPassed ? `पात्र (${category})` : `केवल ${scholarship.categories.join(', ')} हेतु मान्य`,
+      },
+      {
+        rule: 'लिंग पात्रता (Gender)',
+        passed: genderPassed,
+        reason: genderPassed ? 'पात्र' : `केवल ${scholarship.genders && scholarship.genders.includes('FEMALE') ? 'छात्राओं' : 'छात्रों'} हेतु`,
+      },
+      {
+        rule: 'वार्षिक आय सीमा (Income Ceiling)',
+        passed: incomePassed,
+        reason: incomePassed
+          ? `स्वीकृत (₹${annualIncome.toLocaleString('en-IN')} ≤ ₹${scholarship.maxIncome.toLocaleString('en-IN')})`
+          : `अधिक (अधिकतम ₹${scholarship.maxIncome.toLocaleString('en-IN')})`,
+      },
+      {
+        rule: '12वीं कटऑफ प्रतिशत (12th Marks)',
+        passed: marksPassed,
+        reason: marksPassed
+          ? `अर्ह (${twelfthPercentage}% ≥ ${scholarship.minPercentage}%)`
+          : `न्यूनतम ${scholarship.minPercentage}% अनिवार्य`,
+      },
+    ];
+
+    if (scholarship.requiresSambal) {
+      rulesEvaluated.push({
+        rule: 'संबल 2.0 पंजीयन (Sambal 2.0)',
+        passed: sambalPassed,
+        reason: sambalPassed ? 'संबल 2.0 कार्ड सत्यापित' : 'संबल 2.0 कार्ड आवश्यक',
+      });
+    }
+
+    if (scholarship.requiresRentedRoom) {
+      rulesEvaluated.push({
+        rule: 'किराया आवास पात्रता (Rented Room)',
+        passed: rentPassed,
+        reason: rentPassed ? 'किराया अनुबंध सत्यापित' : 'किराए का कमरा आवश्यक',
+      });
+    }
+
     return {
       ...scholarship,
       isEligible: eligible,
       rejectionReasons: reasons,
+      rulesEvaluated,
+      documentsRequired: scholarship.requiredDocs || [],
     };
   });
 }

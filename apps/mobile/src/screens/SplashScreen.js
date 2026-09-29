@@ -1,5 +1,4 @@
 // VidyaSetu MP — Premium Splash / Onboarding Screen
-// Faithfully matches Stitch Dark Screen: projects/13816351680170292712/screens/532968bc08ef4d9e9e6774f4256cabc7
 // Features: Official Knowledge Torch Logo, 0 kbps Telemetry, 3-Stat System Card, Dialect Selector,
 // Auto-dismiss countdown timer (3s) so the screen never gets stuck, plus instant Skip button
 import React, { useState, useEffect } from 'react';
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { RADIUS, FONT } from '../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SplashScreen({ onStart }) {
   const { theme, dialect, setDialect, DIALECTS, networkState, isEnglish } = useApp();
@@ -21,7 +21,7 @@ export default function SplashScreen({ onStart }) {
   const isTablet = width >= 768;
   const isSmallScreen = height < 700;
 
-  // Auto-dismiss timer so user never gets stuck on reload!
+  // Auto-dismiss timer so user never gets stuck on reload
   const [countdown, setCountdown] = useState(3);
   useEffect(() => {
     if (countdown <= 0) {
@@ -80,8 +80,9 @@ export default function SplashScreen({ onStart }) {
               activeOpacity={0.7}
             >
               <Text style={s.skipButtonText}>
-                {isEnglish ? `Enter App (${countdown}s) ➔` : `सीधे ऐप देखें (${countdown}s) ➔`}
+                {isEnglish ? `Enter App (${countdown}s)` : `सीधे ऐप देखें (${countdown}s)`}
               </Text>
+              <Ionicons name="arrow-forward" size={11} color={theme.primaryLight} />
             </TouchableOpacity>
           </View>
 
@@ -109,13 +110,16 @@ export default function SplashScreen({ onStart }) {
             {/* 3 Feature Pills */}
             <View style={s.featurePillsRow}>
               <View style={s.featurePill}>
-                <Text style={s.featurePillText}>✈ {isEnglish ? '100% Offline' : '100% ऑफलाइन'}</Text>
+                <Ionicons name="cloud-offline-outline" size={11} color="#FDE68A" />
+                <Text style={s.featurePillText}>{isEnglish ? '100% Offline' : '100% ऑफलाइन'}</Text>
               </View>
               <View style={s.featurePill}>
-                <Text style={s.featurePillText}>🎙 {isEnglish ? '6 Languages' : '5 बोलियाँ + EN'}</Text>
+                <Ionicons name="mic-outline" size={11} color="#FDE68A" />
+                <Text style={s.featurePillText}>{isEnglish ? '6 Languages' : '5 बोलियाँ + EN'}</Text>
               </View>
               <View style={s.featurePill}>
-                <Text style={s.featurePillText}>💰 {isEnglish ? '48 Schemes' : '48 योजनाएं'}</Text>
+                <Ionicons name="cash-outline" size={11} color="#FDE68A" />
+                <Text style={s.featurePillText}>{isEnglish ? '48 Schemes' : '48 योजनाएं'}</Text>
               </View>
             </View>
           </View>
@@ -159,16 +163,19 @@ export default function SplashScreen({ onStart }) {
             onPress={onStart}
             activeOpacity={0.85}
           >
-            <Text style={s.launchButtonText}>
-              {isEnglish ? 'Launch VidyaSetu ▶' : 'पाठशाला शुरू करें ▶'}
-            </Text>
+            <View style={s.launchButtonContent}>
+              <Text style={s.launchButtonText}>
+                {isEnglish ? 'Launch VidyaSetu' : 'पाठशाला शुरू करें'}
+              </Text>
+              <Ionicons name="arrow-forward-circle" size={18} color="#FFFFFF" />
+            </View>
           </TouchableOpacity>
 
           {/* REGIONAL DIALECT PICKER */}
           <View style={s.dialectSection}>
             <View style={s.dialectSectionHeader}>
               <Text style={s.dialectPickerLabel}>
-                {isEnglish ? 'Choose Language / Dialect:' : 'अपनी क्षेत्रीय बोली चुनें (Select Dialect):'}
+                {isEnglish ? 'Choose Language / Dialect:' : 'अपनी क्षेत्रीय बोली चुनें:'}
               </Text>
               <Text style={s.bilingualBadge}>Bilingual Audio</Text>
             </View>
@@ -178,7 +185,7 @@ export default function SplashScreen({ onStart }) {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.dialectScrollContainer}
             >
-              {DIALECTS.map((d) => {
+              {(DIALECTS || []).map((d) => {
                 const isSelected = dialect === d.code;
                 return (
                   <TouchableOpacity
@@ -187,9 +194,14 @@ export default function SplashScreen({ onStart }) {
                     onPress={() => setDialect(d.code)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[s.dialectPillText, isSelected && s.dialectPillTextActive]}>
-                      {isSelected ? `✓ ${d.label}` : d.label}
-                    </Text>
+                    <View style={s.dialectLabelRow}>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={12} color="#FFFFFF" style={{ marginRight: 3 }} />
+                      )}
+                      <Text style={[s.dialectPillText, isSelected && s.dialectPillTextActive]}>
+                        {d.label}
+                      </Text>
+                    </View>
                     <Text style={[s.dialectSubLabel, isSelected && s.dialectSubLabelActive]}>
                       {d.sub}
                     </Text>
@@ -207,8 +219,9 @@ export default function SplashScreen({ onStart }) {
                 : 'मध्य प्रदेश शासन • बरकतउल्ला विश्वविद्यालय संबद्ध'}
             </Text>
             <View style={s.guaranteePill}>
+              <Ionicons name="shield-checkmark-outline" size={12} color="#10B981" />
               <Text style={s.guaranteeText}>
-                ✈ {isEnglish ? 'Offline Mode' : 'ऑफलाइन मोड'} • 0 kbps • {isEnglish ? 'All Content Ready' : 'सभी सामग्री सुरक्षित'}
+                {isEnglish ? 'Offline Mode' : 'ऑफलाइन मोड'} • 0 kbps • {isEnglish ? 'All Content Ready' : 'सभी सामग्री सुरक्षित'}
               </Text>
             </View>
           </View>
@@ -222,7 +235,7 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#0A192F', // Signature Midnight Stitch Slate
+      backgroundColor: '#080E1C',
     },
     autoProgressLine: {
       height: 3,
@@ -277,25 +290,28 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       opacity: 0.35,
     },
     pulseDotCore: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
     },
     statusText: {
-      fontSize: 11,
+      fontSize: 10.5,
       fontWeight: FONT.weights.semibold,
       color: '#CBD5E1',
     },
     skipButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
       backgroundColor: 'rgba(245, 158, 11, 0.15)',
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: RADIUS.pill,
       borderWidth: 1,
-      borderColor: 'rgba(245, 158, 11, 0.4)',
+      borderColor: 'rgba(245, 158, 11, 0.35)',
     },
     skipButtonText: {
-      fontSize: 10.5,
+      fontSize: 10,
       fontWeight: FONT.weights.bold,
       color: theme.primaryLight,
     },
@@ -303,42 +319,42 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
     // Brand Hero Section
     brandHero: {
       alignItems: 'center',
-      marginVertical: isSmallScreen ? 6 : 12,
+      marginVertical: isSmallScreen ? 6 : 10,
     },
     emblemWrapper: {
       position: 'relative',
-      width: isTablet ? 140 : 116,
-      height: isTablet ? 140 : 116,
+      width: isTablet ? 130 : 105,
+      height: isTablet ? 130 : 105,
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 8,
+      marginBottom: 6,
     },
     emblemGlowAura: {
       position: 'absolute',
-      width: isTablet ? 160 : 136,
-      height: isTablet ? 160 : 136,
-      borderRadius: 80,
-      backgroundColor: 'rgba(245, 158, 11, 0.22)',
+      width: isTablet ? 150 : 120,
+      height: isTablet ? 150 : 120,
+      borderRadius: 60,
+      backgroundColor: 'rgba(245, 158, 11, 0.2)',
     },
     torchLogoImage: {
-      width: isTablet ? 130 : 108,
-      height: isTablet ? 130 : 108,
+      width: isTablet ? 120 : 96,
+      height: isTablet ? 120 : 96,
     },
     brandTitleHindi: {
-      fontSize: isTablet ? 34 : 28,
-      fontWeight: FONT.weights.extrabold,
+      fontSize: isTablet ? 32 : 26,
+      fontWeight: FONT.weights.black,
       color: '#FFFFFF',
       letterSpacing: 0.5,
     },
     brandTitleEnglish: {
-      fontSize: isTablet ? 13 : 11,
+      fontSize: isTablet ? 12 : 10.5,
       fontWeight: FONT.weights.extrabold,
       color: theme.primaryLight,
       letterSpacing: 2.5,
       marginTop: 1,
     },
     brandTagline: {
-      fontSize: isTablet ? 12.5 : 11,
+      fontSize: isTablet ? 12 : 10.5,
       color: '#94A3B8',
       fontWeight: FONT.weights.medium,
       textAlign: 'center',
@@ -352,15 +368,18 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       gap: 6,
     },
     featurePill: {
-      backgroundColor: 'rgba(255, 255, 255, 0.07)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: 'rgba(255, 255, 255, 0.06)',
       paddingHorizontal: 10,
       paddingVertical: 3.5,
       borderRadius: RADIUS.pill,
       borderWidth: 1,
-      borderColor: 'rgba(245, 158, 11, 0.3)',
+      borderColor: 'rgba(245, 158, 11, 0.25)',
     },
     featurePillText: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: FONT.weights.semibold,
       color: '#FDE68A',
     },
@@ -368,17 +387,18 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
     // Stats Card (3-Column)
     statsCard: {
       flexDirection: 'row',
-      backgroundColor: '#131C31',
-      borderRadius: RADIUS.lg,
+      backgroundColor: '#0F182E',
+      borderRadius: RADIUS.xl,
       padding: isTablet ? 16 : 12,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.1)',
+      borderColor: 'rgba(255, 255, 255, 0.08)',
       elevation: 4,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.4,
+      shadowOpacity: 0.35,
       shadowRadius: 8,
       marginBottom: 12,
+      alignItems: 'center',
     },
     statCol: {
       flex: 1,
@@ -386,22 +406,22 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
     },
     statDivider: {
       width: 1,
+      height: 30,
       backgroundColor: 'rgba(255, 255, 255, 0.08)',
-      marginHorizontal: 4,
     },
     statNum: {
-      fontSize: isTablet ? 20 : 17,
-      fontWeight: FONT.weights.extrabold,
+      fontSize: isTablet ? 19 : 16,
+      fontWeight: FONT.weights.black,
       color: '#FFFFFF',
     },
     statLabel: {
-      fontSize: 9.5,
+      fontSize: 9,
       color: '#94A3B8',
       marginTop: 2,
       marginBottom: 3,
     },
     statTagGreen: {
-      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
       paddingHorizontal: 5,
       paddingVertical: 1.5,
       borderRadius: 4,
@@ -409,12 +429,12 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       borderColor: '#10B981',
     },
     statTagGreenText: {
-      fontSize: 8,
+      fontSize: 7.5,
       fontWeight: FONT.weights.bold,
       color: '#34D399',
     },
     statTagAmber: {
-      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
       paddingHorizontal: 5,
       paddingVertical: 1.5,
       borderRadius: 4,
@@ -422,12 +442,12 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       borderColor: theme.primary,
     },
     statTagAmberText: {
-      fontSize: 8,
+      fontSize: 7.5,
       fontWeight: FONT.weights.bold,
       color: '#FBBF24',
     },
     statTagSky: {
-      backgroundColor: 'rgba(56, 189, 248, 0.15)',
+      backgroundColor: 'rgba(56, 189, 248, 0.12)',
       paddingHorizontal: 5,
       paddingVertical: 1.5,
       borderRadius: 4,
@@ -435,7 +455,7 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       borderColor: '#38BDF8',
     },
     statTagSkyText: {
-      fontSize: 8,
+      fontSize: 7.5,
       fontWeight: FONT.weights.bold,
       color: '#38BDF8',
     },
@@ -443,21 +463,26 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
     // Launch Button
     launchButton: {
       backgroundColor: theme.primary,
-      borderRadius: RADIUS.md,
-      paddingVertical: isTablet ? 15 : 13,
+      borderRadius: RADIUS.pill,
+      paddingVertical: isTablet ? 14 : 12,
       paddingHorizontal: 20,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 4,
-      shadowColor: theme.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.45,
-      shadowRadius: 10,
+      shadowColor: theme.primaryLight,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
       marginBottom: 12,
+    },
+    launchButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     launchButtonText: {
       color: '#FFFFFF',
-      fontSize: isTablet ? 16 : 14.5,
+      fontSize: isTablet ? 15 : 14,
       fontWeight: FONT.weights.extrabold,
       letterSpacing: 0.3,
     },
@@ -474,12 +499,12 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       paddingHorizontal: 2,
     },
     dialectPickerLabel: {
-      fontSize: 10.5,
+      fontSize: 10,
       fontWeight: FONT.weights.bold,
       color: '#CBD5E1',
     },
     bilingualBadge: {
-      fontSize: 9,
+      fontSize: 8.5,
       color: theme.primaryLight,
       fontWeight: FONT.weights.semibold,
     },
@@ -488,20 +513,25 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       paddingBottom: 2,
     },
     dialectPill: {
-      backgroundColor: '#131C31',
+      backgroundColor: '#0F182E',
       paddingHorizontal: 11,
       paddingVertical: 5,
-      borderRadius: 8,
+      borderRadius: RADIUS.pill,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.12)',
+      borderColor: 'rgba(255, 255, 255, 0.1)',
       alignItems: 'center',
+    },
+    dialectLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     dialectPillActive: {
       backgroundColor: theme.primary,
       borderColor: theme.primaryBright,
     },
     dialectPillText: {
-      fontSize: 11,
+      fontSize: 10.5,
       fontWeight: FONT.weights.bold,
       color: '#E2E8F0',
     },
@@ -510,7 +540,7 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       fontWeight: FONT.weights.extrabold,
     },
     dialectSubLabel: {
-      fontSize: 8,
+      fontSize: 7.5,
       color: '#94A3B8',
       marginTop: 1,
     },
@@ -527,12 +557,15 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       gap: 5,
     },
     affiliationText: {
-      fontSize: 9.5,
+      fontSize: 9,
       color: '#64748B',
       textAlign: 'center',
     },
     guaranteePill: {
-      backgroundColor: '#111927',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: '#0F182E',
       paddingHorizontal: 9,
       paddingVertical: 3,
       borderRadius: RADIUS.pill,
@@ -540,7 +573,7 @@ const makeStyles = (theme, width, height, isTablet, isSmallScreen) =>
       borderColor: 'rgba(255, 255, 255, 0.08)',
     },
     guaranteeText: {
-      fontSize: 9,
+      fontSize: 8.5,
       color: '#CBD5E1',
     },
   });

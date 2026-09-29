@@ -1,6 +1,6 @@
 // VidyaSetu MP — Learn Screen (पाठशाला)
-// Features: .VSMP Micro-Pack Loader, Audio-Slide Vector Player, 240p Ultra-Compressed Video, Offline Quiz, Full English & Dialect Support
-// Adaptive for all screen sizes (phones, tablets, web desktop)
+// Features: Student Audio-Slide Vector Player, 240p Ultra-Compressed E-Lecture, Offline Quiz, Full English & Dialect Support
+// Real Vector Icons via @expo/vector-icons, Optimistic UI Navigation, Zero Emojis
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,17 +11,22 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { COURSE_MODULE } from '../data/courseModule';
 import { SPACING, RADIUS, FONT } from '../constants/theme';
+import { contentApi } from '../api/index.js';
+import { downloadManager } from '../services/DownloadManager.js';
+import { syncEngine } from '../services/SyncEngine.js';
+import { lectureMediaService } from '../services/LectureMediaService.js';
 
 export default function LearnScreen() {
-  const { theme, dialect, DIALECTS, networkState, t, isEnglish } = useApp();
+  const { theme, dialect, DIALECTS, networkState, t, isEnglish, showToast } = useApp();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const s = makeStyles(theme, isTablet);
 
-  const [mediaMode, setMediaMode] = useState('AUDIO_SLIDE'); // 'AUDIO_SLIDE' | 'VIDEO' | 'VSMP_INSPECTOR'
+  const [mediaMode, setMediaMode] = useState('AUDIO_SLIDE'); // 'AUDIO_SLIDE' | 'VIDEO'
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
@@ -31,17 +36,104 @@ export default function LearnScreen() {
   const [playbackSpeed, setPlaybackSpeed] = useState('1.0x');
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [showResult, setShowResult] = useState(false);
+  const [showPlayOverlay, setShowPlayOverlay] = useState(false);
+  const [eqBars, setEqBars] = useState([6, 14, 20, 10, 24, 16, 8, 18]);
+
+  // Local-first .VSMP download & cache tracking
+  const [isDownloaded, setIsDownloaded] = useState(
+    downloadManager.isPackDownloaded('HIS_BA1_MOD1_INDUS_VALLEY')
+  );
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(100);
+
+  useEffect(() => {
+    const unsub = downloadManager.addListener(() => {
+      setIsDownloaded(downloadManager.isPackDownloaded('HIS_BA1_MOD1_INDUS_VALLEY'));
+    });
+    return unsub;
+  }, []);
+
+  const handleDownloadPack = async () => {
+    if (isDownloaded || isDownloading) return;
+    setIsDownloading(true);
+    const res = await downloadManager.startDownload(
+      {
+        id: 'HIS_BA1_MOD1_INDUS_VALLEY',
+        title_hindi: COURSE_MODULE.module_title_hindi,
+        title_english: COURSE_MODULE.module_title_english,
+        pack_size_bytes: 17684,
+      },
+      (pct) => setDownloadProgress(pct)
+    );
+    setIsDownloading(false);
+    if (res.isSuccess) {
+      setIsDownloaded(true);
+      if (showToast) {
+        showToast(
+          isEnglish ? 'History Module 1 cached for 0 kbps playback!' : 'इतिहास मॉड्यूल 1 0 kbps प्लेबैक हेतु सुरक्षित!',
+          'success'
+        );
+      }
+    }
+  };
 
   const currentSlide = COURSE_MODULE.slides[currentSlideIndex];
   const AUDIO_DURATION = 165;
   const VIDEO_DURATION = 180;
 
-  const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m < 10 ? '0' : ''}${m}:${sec < 10 ? '0' : ''}${sec}`;
+  const formatTime = (sec) => {
+    const m = Math.floor(sec / 60);
+    const sRem = sec % 60;
+    return `${m < 10 ? '0' : ''}${m}:${sRem < 10 ? '0' : ''}${sRem}`;
   };
 
+  const dialectObj = DIALECTS.find((d) => d.code === dialect);
+  const dialectLabel = dialectObj?.label || 'हिंदी';
+
+  const activeTranscript =
+    currentSlide?.transcript?.[dialect] ||
+    currentSlide?.transcript?.en ||
+    currentSlide?.transcript?.hi ||
+    '';
+
+  const activeSlideTitle = (isEnglish ? currentSlide?.titleEn : currentSlide?.title) || '';
+  const activeSlideSubtitle = (isEnglish ? currentSlide?.subtitleEn : currentSlide?.subtitle) || '';
+  const activeBullets = (isEnglish ? currentSlide?.bulletsEn : currentSlide?.bullets) || [];
+  const activeGlossary = (isEnglish ? currentSlide?.glossaryEn : currentSlide?.glossary) || '';
+
+  // Calculate dynamic laser pointer focus sector in video mode
+  const activeLaserSector = Math.floor((videoProgress % 18) / 6); // 0, 1, 2
+
+  // Animate Equalizer Waveform bars while playing audio or video
+  useEffect(() => {
+    let waveInterval;
+    if (isPlayingAudio || isPlayingVideo) {
+      waveInterval = setInterval(() => {
+        setEqBars([
+          Math.floor(Math.random() * 16) + 6,
+          Math.floor(Math.random() * 22) + 8,
+          Math.floor(Math.random() * 28) + 10,
+          Math.floor(Math.random() * 18) + 6,
+          Math.floor(Math.random() * 26) + 8,
+          Math.floor(Math.random() * 16) + 6,
+          Math.floor(Math.random() * 24) + 8,
+          Math.floor(Math.random() * 14) + 6,
+        ]);
+      }, 120);
+    } else {
+      setEqBars([4, 4, 4, 4, 4, 4, 4, 4]);
+    }
+    return () => clearInterval(waveInterval);
+  }, [isPlayingAudio, isPlayingVideo]);
+
+  // Clean up speech synthesis on component unmount
+  useEffect(() => {
+    return () => {
+      lectureMediaService.stopLectureAudio();
+    };
+  }, []);
+
+  // Audio timer
   useEffect(() => {
     if (!isPlayingAudio) return;
     const timer = setInterval(() => {
@@ -56,6 +148,7 @@ export default function LearnScreen() {
     return () => clearInterval(timer);
   }, [isPlayingAudio]);
 
+  // Video timer
   useEffect(() => {
     if (!isPlayingVideo) return;
     const timer = setInterval(() => {
@@ -70,14 +163,68 @@ export default function LearnScreen() {
     return () => clearInterval(timer);
   }, [isPlayingVideo]);
 
-  // Reset audio on slide change
-  useEffect(() => {
-    setIsPlayingAudio(false);
-    setAudioProgress(0);
-  }, [currentSlideIndex]);
+  // Real offline speech synthesis narration helper
+  const playLectureSpeech = (rate = playbackSpeed, slideText = activeTranscript) => {
+    const rateVal = parseFloat(rate) || 1.0;
+    const isEn = dialect === 'en' || isEnglish;
+    lectureMediaService.playLectureAudio({
+      text: slideText,
+      lang: isEn ? 'en' : 'hi',
+      rate: rateVal,
+      onEnd: () => {
+        setIsPlayingAudio(false);
+        setIsPlayingVideo(false);
+      },
+    });
+  };
 
-  const dialectObj = DIALECTS.find((d) => d.code === dialect);
-  const dialectLabel = dialectObj?.label || 'हिंदी';
+  const handleToggleAudioPlay = () => {
+    if (isPlayingAudio) {
+      lectureMediaService.stopLectureAudio();
+      setIsPlayingAudio(false);
+    } else {
+      setIsPlayingVideo(false);
+      setIsPlayingAudio(true);
+      playLectureSpeech(playbackSpeed);
+    }
+  };
+
+  const handleToggleVideoPlay = () => {
+    setShowPlayOverlay(true);
+    setTimeout(() => setShowPlayOverlay(false), 650);
+
+    if (isPlayingVideo) {
+      lectureMediaService.stopLectureAudio();
+      setIsPlayingVideo(false);
+    } else {
+      setIsPlayingAudio(false);
+      setIsPlayingVideo(true);
+      playLectureSpeech(playbackSpeed);
+    }
+  };
+
+  const handleSpeedChange = (speed) => {
+    setPlaybackSpeed(speed);
+    if (isPlayingAudio || isPlayingVideo) {
+      playLectureSpeech(speed);
+    }
+  };
+
+  const handleSlideChange = (newIndex) => {
+    lectureMediaService.stopLectureAudio();
+    setIsPlayingAudio(false);
+    setIsPlayingVideo(false);
+    setAudioProgress(0);
+    setVideoProgress(0);
+    setCurrentSlideIndex(newIndex);
+  };
+
+  const handleSwitchMediaMode = (mode) => {
+    lectureMediaService.stopLectureAudio();
+    setIsPlayingAudio(false);
+    setIsPlayingVideo(false);
+    setMediaMode(mode);
+  };
 
   const handleQuizSubmit = () => {
     const answered = Object.keys(selectedAnswers).length;
@@ -91,23 +238,37 @@ export default function LearnScreen() {
       );
       return;
     }
+
+    const calculatedScore = COURSE_MODULE.quiz.filter(
+      (q) => selectedAnswers[q.id] === q.correctIndex
+    ).length;
+
     setShowResult(true);
+
+    // Enqueue learning progress mutation for background sync
+    const pctScore = Math.round((calculatedScore / COURSE_MODULE.quiz.length) * 100);
+    syncEngine.enqueueMutation('learning_progress', 'HIS_BA1_MOD1_INDUS_VALLEY', 'UPSERT', {
+      lesson_id: 'HIS_BA1_MOD1_INDUS_VALLEY',
+      course_id: 'COURSE_HIS_BA1',
+      quiz_score: pctScore,
+      completed_seconds: audioProgress || 165,
+      is_completed: true,
+      timestamp: Date.now(),
+    });
+
+    if (showToast) {
+      showToast(
+        isEnglish
+          ? `Quiz passed (${calculatedScore}/${COURSE_MODULE.quiz.length})! Progress saved locally & queued for sync.`
+          : `प्रश्नोत्तरी संपन्न (${calculatedScore}/${COURSE_MODULE.quiz.length})! प्रगति सुरक्षित, सिग्नल पर स्वतः सिंक होगी।`,
+        'success'
+      );
+    }
   };
 
   const score = COURSE_MODULE.quiz.filter(
     (q) => selectedAnswers[q.id] === q.correctIndex
   ).length;
-
-  const activeTranscript =
-    currentSlide?.transcript?.[dialect] ||
-    currentSlide?.transcript?.en ||
-    currentSlide?.transcript?.hi ||
-    '';
-
-  const activeSlideTitle = isEnglish ? currentSlide.titleEn : currentSlide.title;
-  const activeSlideSubtitle = isEnglish ? currentSlide.subtitleEn : currentSlide.subtitle;
-  const activeBullets = isEnglish ? currentSlide.bulletsEn : currentSlide.bullets;
-  const activeGlossary = isEnglish ? currentSlide.glossaryEn : currentSlide.glossary;
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
@@ -116,43 +277,82 @@ export default function LearnScreen() {
         <View style={s.moduleCard}>
           <View style={s.metaRow}>
             <View style={s.vsmpBadge}>
-              <Text style={s.vsmpBadgeText}>📦 .VSMP {COURSE_MODULE.packSize}</Text>
+              <Ionicons name="book-outline" size={11} color="#34D399" />
+              <Text style={s.vsmpBadgeText}>{isEnglish ? 'History Module 1' : 'इतिहास भाग 1'}</Text>
             </View>
             <View style={s.degreeBadge}>
               <Text style={s.degreeBadgeText}>{COURSE_MODULE.degree_stream}</Text>
             </View>
-            <View style={s.offlineReadyBadge}>
-              <Text style={s.offlineReadyText}>
-                {networkState.isOnline ? '⚡ 2G/3G Ready' : '🛡️ 100% Offline Cached'}
+            <TouchableOpacity
+              style={[
+                s.offlineReadyBadge,
+                isDownloaded && { borderColor: 'rgba(52, 211, 153, 0.4)', backgroundColor: 'rgba(52, 211, 153, 0.1)' }
+              ]}
+              onPress={handleDownloadPack}
+              activeOpacity={0.7}
+              disabled={isDownloaded || isDownloading}
+            >
+              <Ionicons
+                name={
+                  isDownloaded
+                    ? 'shield-checkmark'
+                    : isDownloading
+                    ? 'sync-outline'
+                    : 'cloud-download-outline'
+                }
+                size={11}
+                color={isDownloaded ? '#34D399' : theme.primaryLight}
+              />
+              <Text
+                style={[
+                  s.offlineReadyText,
+                  isDownloaded && { color: '#34D399', fontWeight: '700' }
+                ]}
+              >
+                {isDownloaded
+                  ? (isEnglish ? '100% Offline (.VSMP)' : '100% ऑफलाइन (.VSMP)')
+                  : isDownloading
+                  ? `${downloadProgress}% ...`
+                  : (isEnglish ? 'Download .VSMP' : '.VSMP डाउनलोड')}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <Text style={s.moduleTitle}>
             {isEnglish ? COURSE_MODULE.module_title_english : COURSE_MODULE.module_title_hindi}
           </Text>
-          <Text style={s.moduleSubtitle}>
-            🏛️ {COURSE_MODULE.university} • {COURSE_MODULE.syllabusRef}
-          </Text>
+          <View style={s.universityRow}>
+            <Ionicons name="school-outline" size={13} color={theme.textMuted} />
+            <Text style={s.moduleSubtitle}>
+              {COURSE_MODULE.university} • {COURSE_MODULE.syllabusRef}
+            </Text>
+          </View>
 
-          {/* 3-WAY MEDIA MODE SWITCHER */}
+          {/* 2-WAY MEDIA MODE SWITCHER */}
           <View style={s.modeToggle}>
             {[
-              { key: 'AUDIO_SLIDE', label: isEnglish ? '🎧 Audio-Slide' : '🎧 ऑडियो-स्लाइड' },
-              { key: 'VIDEO',       label: isEnglish ? '🎬 E-Lecture'   : '🎬 ई-व्याख्यान' },
-              { key: 'VSMP_INSPECTOR', label: isEnglish ? '📦 .VSMP Spec' : '📦 .VSMP विवरण' },
-            ].map((m) => (
-              <TouchableOpacity
-                key={m.key}
-                style={[s.modeBtn, mediaMode === m.key && s.modeBtnActive]}
-                onPress={() => setMediaMode(m.key)}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.modeBtnText, mediaMode === m.key && s.modeBtnTextActive]}>
-                  {m.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+              { key: 'AUDIO_SLIDE', icon: 'headset-outline', label: isEnglish ? 'Audio-Slide' : 'ऑडियो-स्लाइड' },
+              { key: 'VIDEO',       icon: 'videocam-outline', label: isEnglish ? 'E-Lecture'   : 'ई-व्याख्यान' },
+            ].map((m) => {
+              const active = mediaMode === m.key;
+              return (
+                <TouchableOpacity
+                  key={m.key}
+                  style={[s.modeBtn, active && s.modeBtnActive]}
+                  onPress={() => handleSwitchMediaMode(m.key)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={m.icon}
+                    size={14}
+                    color={active ? '#FFFFFF' : theme.textMuted}
+                  />
+                  <Text style={[s.modeBtnText, active && s.modeBtnTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* MODE 1: AUDIO-SLIDE VECTOR PLAYER */}
@@ -160,13 +360,13 @@ export default function LearnScreen() {
             <View style={s.slidePlayerContainer}>
               {/* Stepper */}
               <View style={s.stepperRow}>
-                {COURSE_MODULE.slides.map((sl, idx) => {
+                {(COURSE_MODULE?.slides || []).map((sl, idx) => {
                   const isActive = currentSlideIndex === idx;
                   return (
                     <TouchableOpacity
                       key={sl.slideIndex}
                       style={[s.stepTab, isActive && s.stepTabActive]}
-                      onPress={() => setCurrentSlideIndex(idx)}
+                      onPress={() => handleSlideChange(idx)}
                       activeOpacity={0.8}
                     >
                       <Text style={[s.stepNum, isActive && s.stepNumActive]}>0{idx + 1}</Text>
@@ -200,9 +400,12 @@ export default function LearnScreen() {
                       </Text>
                       <View style={s.gridGraphic}>
                         <View style={s.citadelPill}>
-                          <Text style={s.citadelTitle}>
-                            🏛️ {isEnglish ? 'CITADEL (WESTERN MOUND)' : 'सिटाडेल (पश्चिमी टीला)'}
-                          </Text>
+                          <View style={s.pillIconRow}>
+                            <Ionicons name="business-outline" size={13} color="#93C5FD" />
+                            <Text style={s.citadelTitle}>
+                              {isEnglish ? 'CITADEL (WESTERN MOUND)' : 'सिटाडेल (पश्चिमी टीला)'}
+                            </Text>
+                          </View>
                           <Text style={s.citadelDesc}>
                             {isEnglish ? 'Administrative Granary & Assembly Hall' : 'प्रशासनिक भवन एवं विशाल अन्नागार'}
                           </Text>
@@ -213,9 +416,12 @@ export default function LearnScreen() {
                           <View style={s.streetLineH} />
                         </View>
                         <View style={s.lowerTownPill}>
-                          <Text style={s.lowerTownTitle}>
-                            🏘️ {isEnglish ? 'LOWER TOWN (RESIDENTIAL)' : 'निचला नगर (आवासीय क्षेत्र)'}
-                          </Text>
+                          <View style={s.pillIconRow}>
+                            <Ionicons name="home-outline" size={13} color="#6EE7B7" />
+                            <Text style={s.lowerTownTitle}>
+                              {isEnglish ? 'LOWER TOWN (RESIDENTIAL)' : 'निचला नगर (आवासीय क्षेत्र)'}
+                            </Text>
+                          </View>
                           <Text style={s.lowerTownDesc}>
                             {isEnglish ? 'Subterranean Masonry Drainage System' : 'पक्की ईंटों की भूमिगत ढकी हुई नालियां'}
                           </Text>
@@ -230,16 +436,20 @@ export default function LearnScreen() {
                         [ {isEnglish ? 'MOHENJO-DARO GREAT BATH' : 'मोहनजोदड़ो का विशाल स्नानागार'} ]
                       </Text>
                       <View style={s.bathGraphic}>
-                        <Text style={s.bathStairText}>▲ {isEnglish ? 'North Stairway' : 'उत्तरी सीढ़ियां'}</Text>
+                        <Text style={s.bathStairText}>{isEnglish ? '▲ North Stairway' : '▲ उत्तरी सीढ़ियां'}</Text>
                         <View style={s.bathReservoir}>
-                          <Text style={s.bathPoolText}>💧 11.88m × 7.01m × 2.43m</Text>
+                          <View style={s.pillIconRow}>
+                            <Ionicons name="water-outline" size={14} color="#67E8F9" />
+                            <Text style={s.bathPoolText}>11.88m × 7.01m × 2.43m</Text>
+                          </View>
                           <View style={s.bitumenBadge}>
+                            <Ionicons name="shield-outline" size={11} color="#FDE68A" />
                             <Text style={s.bitumenBadgeText}>
-                              🛡️ {isEnglish ? 'Bitumen + Gypsum Waterproofing' : 'बिटुमेन (डामर) + जिप्सम जलरोधी लेप'}
+                              {isEnglish ? 'Bitumen + Gypsum Waterproofing' : 'बिटुमेन (डामर) + जिप्सम जलरोधी लेप'}
                             </Text>
                           </View>
                         </View>
-                        <Text style={s.bathStairText}>▼ {isEnglish ? 'South Stairway' : 'दक्षिणी सीढ़ियां'}</Text>
+                        <Text style={s.bathStairText}>{isEnglish ? '▼ South Stairway' : '▼ दक्षिणी सीढ़ियां'}</Text>
                       </View>
                     </View>
                   )}
@@ -251,21 +461,30 @@ export default function LearnScreen() {
                       </Text>
                       <View style={s.dockGraphic}>
                         <View style={s.riverInlet}>
-                          <Text style={s.riverText}>
-                            🌊 {isEnglish ? 'Bhogwa River Tidal Ingress' : 'भोगवा नदी ज्वार जलप्रवाह'}
-                          </Text>
+                          <View style={s.pillIconRow}>
+                            <Ionicons name="git-branch-outline" size={13} color="#93C5FD" />
+                            <Text style={s.riverText}>
+                              {isEnglish ? 'Bhogwa River Tidal Ingress' : 'भोगवा नदी ज्वार जलप्रवाह'}
+                            </Text>
+                          </View>
                         </View>
                         <View style={s.lockGateBox}>
-                          <Text style={s.lockGateText}>
-                            ⚙️ {isEnglish ? 'Sluice Lock-Gate (Tidal Control)' : 'लकड़ी का लॉक-गेट (ज्वार नियंत्रण)'}
-                          </Text>
+                          <View style={s.pillIconRow}>
+                            <Ionicons name="cog-outline" size={12} color="#FDE68A" />
+                            <Text style={s.lockGateText}>
+                              {isEnglish ? 'Sluice Lock-Gate (Tidal Control)' : 'लकड़ी का लॉक-गेट (ज्वार नियंत्रण)'}
+                            </Text>
+                          </View>
                         </View>
                         <View style={s.dockBasin}>
-                          <Text style={s.dockBasinTitle}>
-                            ⚓ {isEnglish ? 'Fired-Brick Wharf (214m × 36m)' : 'पक्की ईंटों का गोदी बेसिन (214m × 36m)'}
-                          </Text>
+                          <View style={s.pillIconRow}>
+                            <Ionicons name="boat-outline" size={13} color="#F8FAFC" />
+                            <Text style={s.dockBasinTitle}>
+                              {isEnglish ? 'Fired-Brick Wharf (214m × 36m)' : 'पक्की ईंटों का गोदी बेसिन (214m × 36m)'}
+                            </Text>
+                          </View>
                           <Text style={s.tradeRouteText}>
-                            ⛵ {isEnglish ? 'Mesopotamia & Oman Maritime Silk Route' : 'मेसोपोटामिया एवं ओमान से सील-मोहर व्यापार'}
+                            {isEnglish ? 'Mesopotamia & Oman Maritime Silk Route' : 'मेसोपोटामिया एवं ओमान से सील-मोहर व्यापार'}
                           </Text>
                         </View>
                       </View>
@@ -279,9 +498,9 @@ export default function LearnScreen() {
 
                 {/* Bullets */}
                 <View style={s.bulletContainer}>
-                  {activeBullets.map((b, i) => (
+                  {(activeBullets || []).map((b, i) => (
                     <View key={i} style={s.bulletRow}>
-                      <Text style={s.bulletDot}>◆</Text>
+                      <View style={s.bulletDot} />
                       <Text style={s.bulletItem}>{b}</Text>
                     </View>
                   ))}
@@ -290,7 +509,7 @@ export default function LearnScreen() {
                 {/* Audio Transcript */}
                 <View style={s.transcriptBox}>
                   <View style={s.transcriptHeader}>
-                    <Text style={s.transcriptIcon}>🎙️</Text>
+                    <Ionicons name="mic-outline" size={13} color={theme.primaryLight} />
                     <Text style={s.transcriptLabel}>
                       {isEnglish ? `Audio Transcript (${dialectLabel}):` : `ऑडियो व्याख्या (${dialectLabel}):`}
                     </Text>
@@ -298,7 +517,8 @@ export default function LearnScreen() {
                   <Text style={s.transcriptText}>"{activeTranscript}"</Text>
                   {activeGlossary && (
                     <View style={s.glossaryRow}>
-                      <Text style={s.glossaryLabel}>💡 {isEnglish ? 'Glossary:' : 'शब्दावली:'}</Text>
+                      <Ionicons name="bulb-outline" size={12} color={theme.primaryLight} />
+                      <Text style={s.glossaryLabel}>{isEnglish ? 'Glossary:' : 'शब्दावली:'}</Text>
                       <Text style={s.glossaryText}>{activeGlossary}</Text>
                     </View>
                   )}
@@ -320,24 +540,62 @@ export default function LearnScreen() {
                   <Text style={s.timeText}>{formatTime(AUDIO_DURATION)}</Text>
                 </View>
 
+                {/* Animated EQ Bars when audio playing */}
+                <View style={s.audioEqRow}>
+                  {eqBars.map((h, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        s.audioEqBar,
+                        { height: isPlayingAudio ? h : 3 },
+                        isPlayingAudio && { backgroundColor: theme.primaryLight },
+                      ]}
+                    />
+                  ))}
+                </View>
+
                 <View style={s.audioBtns}>
                   <TouchableOpacity
                     style={[s.navBtn, currentSlideIndex === 0 && s.navBtnDisabled]}
                     disabled={currentSlideIndex === 0}
-                    onPress={() => setCurrentSlideIndex((p) => Math.max(0, p - 1))}
+                    onPress={() => handleSlideChange(Math.max(0, currentSlideIndex - 1))}
                     activeOpacity={0.7}
                   >
+                    <Ionicons name="chevron-back" size={15} color={theme.textSecondary} />
                     <Text style={s.navBtnText}>{t.learn.prev}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
+                    style={s.audioJumpBtn}
+                    onPress={() => setAudioProgress((p) => Math.max(0, p - 10))}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="play-back-outline" size={14} color={theme.textSecondary} />
+                    <Text style={s.audioJumpText}>-10s</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
                     style={s.playBtn}
-                    onPress={() => setIsPlayingAudio((p) => !p)}
+                    onPress={handleToggleAudioPlay}
                     activeOpacity={0.8}
                   >
+                    <Ionicons
+                      name={isPlayingAudio ? 'pause' : 'play'}
+                      size={18}
+                      color="#FFFFFF"
+                    />
                     <Text style={s.playBtnText}>
                       {isPlayingAudio ? t.learn.pause : t.learn.listen}
                     </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={s.audioJumpBtn}
+                    onPress={() => setAudioProgress((p) => Math.min(AUDIO_DURATION, p + 10))}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="play-forward-outline" size={14} color={theme.textSecondary} />
+                    <Text style={s.audioJumpText}>+10s</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -347,75 +605,348 @@ export default function LearnScreen() {
                     ]}
                     disabled={currentSlideIndex === COURSE_MODULE.slides.length - 1}
                     onPress={() =>
-                      setCurrentSlideIndex((p) =>
-                        Math.min(COURSE_MODULE.slides.length - 1, p + 1)
+                      handleSlideChange(
+                        Math.min(COURSE_MODULE.slides.length - 1, currentSlideIndex + 1)
                       )
                     }
                     activeOpacity={0.7}
                   >
                     <Text style={s.navBtnText}>{t.learn.next}</Text>
+                    <Ionicons name="chevron-forward" size={15} color={theme.textSecondary} />
                   </TouchableOpacity>
+                </View>
+
+                {/* Speed Row for Audio */}
+                <View style={s.audioSpeedRow}>
+                  <Text style={s.audioSpeedLabel}>{isEnglish ? 'Playback Speed:' : 'ऑडियो गति:'}</Text>
+                  {['1.0x', '1.25x', '1.5x'].map((sp) => (
+                    <TouchableOpacity
+                      key={sp}
+                      style={[s.miniPill, playbackSpeed === sp && s.miniPillSpeedActive]}
+                      onPress={() => handleSpeedChange(sp)}
+                    >
+                      <Text style={[s.miniPillText, playbackSpeed === sp && s.miniPillTextActive]}>
+                        {sp}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
             </View>
           )}
 
-          {/* MODE 2: 240p ULTRA-COMPRESSED VIDEO */}
+          {/* MODE 2: 240p ULTRA-COMPRESSED VIDEO (VECTOR CINEMA) */}
           {mediaMode === 'VIDEO' && (
             <View style={s.videoWrapper}>
               <View style={s.videoPlayerCard}>
+                {/* VIDEO TOP HUD */}
                 <View style={s.videoTopBar}>
                   <View style={s.videoBrandBadge}>
-                    <Text style={s.videoBrandText}>
-                      {isEnglish ? 'VIDYASETU E-LECTURE' : 'विद्यासेतु MP • ई-व्याख्यान'}
+                    <View style={[s.recDot, isPlayingVideo && s.recDotLive]} />
+                    <Text style={[s.videoBrandText, isPlayingVideo && s.videoBrandTextLive]}>
+                      {isPlayingVideo
+                        ? (isEnglish ? 'REC • LIVE E-LECTURE' : 'लाइव • ई-व्याख्यान प्रसारण')
+                        : (isEnglish ? 'E-LECTURE CINEMA' : 'ई-व्याख्यान सिनेमा')}
                     </Text>
                   </View>
-                  <View style={s.vsmpStreamPill}>
-                    <Text style={s.vsmpStreamText}>
-                      .VSMP • {videoQuality} ({networkState.isOnline ? '110 kbps' : 'Offline'})
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={s.stageArea}>
-                  <View style={s.facultyTag}>
-                    <Text style={s.facultyEmoji}>👨‍🏫</Text>
-                    <Text style={s.facultyTitle}>
-                      {isEnglish ? 'Dr. R.K. Sharma (Head, Dept. of History)' : 'डॉ. आर. के. शर्मा (विभागाध्यक्ष — इतिहास)'}
-                    </Text>
-                  </View>
-
-                  <View style={s.smartBoard}>
-                    <Text style={s.boardTopic}>
-                      {isEnglish ? 'TOPIC: HARAPPAN TOWN PLANNING & TRADE' : 'विषय: सिंधु घाटी सभ्यता नगर नियोजन एवं व्यापार'}
-                    </Text>
-                    <View style={s.boardGraphicFrame}>
-                      <Text style={s.boardGraphicEmoji}>🏛️ 🌊 🧱</Text>
-                      <Text style={s.boardGraphicMain}>
-                        {currentSlideIndex === 0 && (isEnglish ? 'Checkerboard Grid • Right-Angle Streets' : 'समकोण ग्रिड सड़कें • ड्रेनेज चैनल')}
-                        {currentSlideIndex === 1 && (isEnglish ? 'Great Bath • Gypsum Bitumen Lining' : 'विशाल स्नानागार • बिटुमेन वाटरप्रूफिंग')}
-                        {currentSlideIndex === 2 && (isEnglish ? 'Lothal Tidal Dockyard • Sluice Gates' : 'लोथल बंदरगाह • ज्वारीय लॉक-गेट')}
+                  <View style={s.videoMetaRight}>
+                    <View style={s.vsmpStreamPill}>
+                      <Text style={s.vsmpStreamText}>
+                        .VSMP • {videoQuality} ({networkState.isOnline ? '110 kbps' : '0 kbps Offline'})
                       </Text>
-                      <Text style={s.boardGraphicSub}>
-                        {isEnglish ? 'Decoded from HIS_BA1_MOD1_INDUS_VALLEY.vsmp' : '.vsmp कंटेनर से डिकोड किया गया दृश्य'}
+                    </View>
+                    <View style={s.slideCountPill}>
+                      <Text style={s.slideCountText}>
+                        {isEnglish ? `Part ${currentSlideIndex + 1}/3` : `भाग ${currentSlideIndex + 1}/3`}
                       </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* Subtitles */}
+                {/* 16:9 CINEMA STAGE & INTERACTIVE CANVAS */}
+                <TouchableOpacity
+                  style={s.cinemaStage}
+                  activeOpacity={0.95}
+                  onPress={handleToggleVideoPlay}
+                >
+                  {/* Topic Title Ribbon */}
+                  <View style={s.stageTopicBar}>
+                    <Ionicons name="film-outline" size={13} color="#38BDF8" />
+                    <Text style={s.stageTopicTitle} numberOfLines={1}>
+                      {activeSlideTitle}
+                    </Text>
+                  </View>
+
+                  {/* Archaeological Vector Reconstruction Stage */}
+                  <View style={s.cinemaCanvasArea}>
+                    {currentSlideIndex === 0 && (
+                      <View style={s.videoDiagram}>
+                        <Text style={s.videoDiagramTitle}>
+                          [ {isEnglish ? 'HARAPPAN URBAN GRID PLANNING' : 'हड़प्पा समकोण नगर नियोजन ग्रिड'} ]
+                        </Text>
+                        
+                        <View style={s.videoGridGraphic}>
+                          {/* Western Citadel */}
+                          <View
+                            style={[
+                              s.videoSectorCard,
+                              s.citadelVideoCard,
+                              activeLaserSector === 0 && s.videoSectorActive,
+                            ]}
+                          >
+                            <View style={s.pillIconRow}>
+                              <Ionicons name="business" size={14} color="#93C5FD" />
+                              <Text style={s.citadelVideoTitle}>
+                                {isEnglish ? 'CITADEL (UPPER FORTRESS)' : 'सिटाडेल (पश्चिमी दुर्ग)'}
+                              </Text>
+                              {activeLaserSector === 0 && (
+                                <View style={s.laserMarker}>
+                                  <View style={s.laserDot} />
+                                  <Text style={s.laserText}>FOCUS</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={s.videoSectorDesc}>
+                              {isEnglish ? 'Monumental Granary & Public Assembly' : 'विशाल अन्नागार व प्रशासनिक भवन'}
+                            </Text>
+                          </View>
+
+                          {/* 90° Cross Streets */}
+                          <View
+                            style={[
+                              s.videoSectorCard,
+                              s.streetVideoCard,
+                              activeLaserSector === 1 && s.videoSectorActive,
+                            ]}
+                          >
+                            <View style={s.crossStreetRow}>
+                              <View style={s.streetLineH} />
+                              <View style={s.angleBadge}>
+                                <Ionicons name="git-commit-outline" size={12} color="#FBBF24" />
+                                <Text style={s.angleTag}>90° Orthogonal Streets</Text>
+                              </View>
+                              <View style={s.streetLineH} />
+                            </View>
+                            {activeLaserSector === 1 && (
+                              <View style={s.laserMarkerCenter}>
+                                <View style={s.laserDot} />
+                                <Text style={s.laserText}>GRID AXIS FOCUS</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Lower Town Drains */}
+                          <View
+                            style={[
+                              s.videoSectorCard,
+                              s.lowerTownVideoCard,
+                              activeLaserSector === 2 && s.videoSectorActive,
+                            ]}
+                          >
+                            <View style={s.pillIconRow}>
+                              <Ionicons name="home" size={14} color="#6EE7B7" />
+                              <Text style={s.lowerTownVideoTitle}>
+                                {isEnglish ? 'LOWER TOWN RESIDENTIAL' : 'निचला आवासीय नगर'}
+                              </Text>
+                              {activeLaserSector === 2 && (
+                                <View style={s.laserMarker}>
+                                  <View style={s.laserDot} />
+                                  <Text style={s.laserText}>FOCUS</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={s.videoSectorDesc}>
+                              {isEnglish ? 'Kiln-Fired Subterranean Brick Drainage' : 'भूमिगत पक्की ईंटों की ढकी हुई नालियां'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    {currentSlideIndex === 1 && (
+                      <View style={s.videoDiagram}>
+                        <Text style={s.videoDiagramTitle}>
+                          [ {isEnglish ? 'MOHENJO-DARO GREAT BATH' : 'मोहनजोदड़ो का विशाल स्नानागार'} ]
+                        </Text>
+                        
+                        <View style={s.videoBathGraphic}>
+                          <Text style={s.videoStairText}>▲ {isEnglish ? 'North Entrance Stairway' : 'उत्तरी सीढ़ियां'}</Text>
+                          
+                          <View
+                            style={[
+                              s.videoPoolReservoir,
+                              activeLaserSector === 1 && s.videoSectorActive,
+                            ]}
+                          >
+                            <View style={s.pillIconRow}>
+                              <Ionicons name="water" size={16} color="#67E8F9" />
+                              <Text style={s.videoPoolDimensions}>11.88m × 7.01m × 2.43m</Text>
+                            </View>
+                            <View style={s.waterRippleBar}>
+                              <View style={s.rippleWave} />
+                              <View style={[s.rippleWave, { opacity: 0.6 }]} />
+                              <View style={[s.rippleWave, { opacity: 0.3 }]} />
+                            </View>
+                            <View
+                              style={[
+                                s.videoBitumenPill,
+                                activeLaserSector === 2 && s.videoSectorActive,
+                              ]}
+                            >
+                              <Ionicons name="shield-checkmark" size={12} color="#FDE68A" />
+                              <Text style={s.videoBitumenText}>
+                                {isEnglish ? 'Natural Bitumen & Gypsum Waterproofing' : 'प्राकृतिक बिटुमेन (डामर) + जिप्सम जलरोधी लेप'}
+                              </Text>
+                              {activeLaserSector === 2 && (
+                                <View style={s.laserDot} />
+                              )}
+                            </View>
+                          </View>
+
+                          <Text style={s.videoStairText}>▼ {isEnglish ? 'South Entrance Stairway' : 'दक्षिणी सीढ़ियां'}</Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {currentSlideIndex === 2 && (
+                      <View style={s.videoDiagram}>
+                        <Text style={s.videoDiagramTitle}>
+                          [ {isEnglish ? 'LOTHAL MARITIME TIDAL DOCKYARD' : 'लोथल ज्वारीय गोदीबाड़ा एवं बंदरगाह'} ]
+                        </Text>
+                        
+                        <View style={s.videoDockGraphic}>
+                          {/* River Ingress */}
+                          <View
+                            style={[
+                              s.videoRiverCard,
+                              activeLaserSector === 0 && s.videoSectorActive,
+                            ]}
+                          >
+                            <View style={s.pillIconRow}>
+                              <Ionicons name="git-branch" size={14} color="#93C5FD" />
+                              <Text style={s.videoRiverTitle}>
+                                {isEnglish ? 'Bhogwa River Tidal Ingress Canal' : 'भोगवा नदी ज्वार जलप्रवाह नहर'}
+                              </Text>
+                              {activeLaserSector === 0 && <View style={s.laserDot} />}
+                            </View>
+                          </View>
+
+                          {/* Sluice Gate */}
+                          <View
+                            style={[
+                              s.videoLockGate,
+                              activeLaserSector === 1 && s.videoSectorActive,
+                            ]}
+                          >
+                            <View style={s.pillIconRow}>
+                              <Ionicons name="cog" size={13} color="#FDE68A" />
+                              <Text style={s.videoLockGateTitle}>
+                                {isEnglish ? 'Wooden Sluice Lock-Gate (Tidal Control)' : 'लकड़ी का स्लूइस लॉक-गेट (ज्वार नियंत्रण)'}
+                              </Text>
+                              {activeLaserSector === 1 && <View style={s.laserDot} />}
+                            </View>
+                          </View>
+
+                          {/* Wharf Basin */}
+                          <View
+                            style={[
+                              s.videoBasinCard,
+                              activeLaserSector === 2 && s.videoSectorActive,
+                            ]}
+                          >
+                            <View style={s.pillIconRow}>
+                              <Ionicons name="boat" size={15} color="#F8FAFC" />
+                              <Text style={s.videoBasinTitle}>
+                                {isEnglish ? 'Fired-Brick Basin (214m × 36m)' : 'पक्की ईंटों का गोदी बेसिन (214m × 36m)'}
+                              </Text>
+                            </View>
+                            <Text style={s.videoTradeRoute}>
+                              {isEnglish ? 'Maritime Route: Dilmun (Bahrain) & Mesopotamia' : 'समुद्री व्यापार: दिलमुन (बहरीन) एवं मेसोपोटामिया'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* FACULTY PIP INSET (Picture-in-Picture) */}
+                  <View style={s.facultyPipCard}>
+                    <View style={s.pipAvatarWrap}>
+                      <Ionicons name="person" size={22} color="#60A5FA" />
+                      <View style={[s.pipMicBadge, isPlayingVideo && s.pipMicBadgeActive]}>
+                        <Ionicons name="mic" size={9} color="#FFFFFF" />
+                      </View>
+                    </View>
+                    <View style={s.pipInfo}>
+                      <View style={s.pipStatusRow}>
+                        <View style={[s.liveDot, isPlayingVideo && s.liveDotActive]} />
+                        <Text style={[s.pipLiveText, isPlayingVideo && s.pipLiveTextActive]}>
+                          {isPlayingVideo ? (isEnglish ? 'LIVE LECTURE' : 'लाइव व्याख्यान') : (isEnglish ? 'PAUSED' : 'विराम')}
+                        </Text>
+                      </View>
+                      <Text style={s.pipNameText} numberOfLines={1}>
+                        {isEnglish ? 'Dr. R.K. Sharma' : 'डॉ. आर. के. शर्मा'}
+                      </Text>
+                      {/* Bouncing Audio EQ Bars */}
+                      <View style={s.pipEqRow}>
+                        {eqBars.slice(0, 6).map((h, i) => (
+                          <View
+                            key={i}
+                            style={[
+                              s.pipEqBar,
+                              { height: isPlayingVideo ? Math.min(18, h) : 3 },
+                            ]}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* BIG CENTER PLAY OVERLAY WHEN PAUSED */}
+                  {!isPlayingVideo && (
+                    <View style={s.centerPlayOverlay}>
+                      <View style={s.centerPlayCircle}>
+                        <Ionicons name="play" size={28} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                      </View>
+                      <View style={s.centerPlayBanner}>
+                        <Ionicons name="flash-outline" size={12} color="#FDE68A" />
+                        <Text style={s.centerPlayBannerText}>
+                          {isEnglish ? 'Tap to Play E-Lecture • 0 kbps' : 'ई-व्याख्यान शुरू करें • 0 kbps'}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* TAP FEEDBACK RIPPLE */}
+                  {showPlayOverlay && isPlayingVideo && (
+                    <View style={s.tapFeedbackOverlay}>
+                      <View style={s.tapFeedbackCircle}>
+                        <Ionicons name="pause" size={24} color="#FFFFFF" />
+                      </View>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* CLOSED CAPTIONS / SUBTITLE RIBBON */}
                 <View style={s.subtitleContainer}>
                   <View style={s.subHeaderRow}>
-                    <Text style={s.subTag}>CC • {dialectLabel.toUpperCase()}</Text>
-                    <Text style={s.subSyncText}>
-                      {isEnglish ? 'Synchronized with Opus 14kbps' : 'ऑपस 14kbps से सिंक'}
-                    </Text>
+                    <View style={s.ccBadge}>
+                      <Ionicons name="chatbox-ellipses" size={11} color="#F59E0B" />
+                      <Text style={s.subTag}>CC • {dialectLabel.toUpperCase()}</Text>
+                    </View>
+                    <View style={s.subSyncRow}>
+                      <Ionicons name="volume-medium" size={11} color="#34D399" />
+                      <Text style={s.subSyncText}>
+                        {isEnglish ? 'Synchronized Indic Audio' : 'ऑडियो व्याख्या सिंक्रोनाइज्ड'}
+                      </Text>
+                    </View>
                   </View>
                   <Text style={s.subtitleLine}>"{activeTranscript}"</Text>
                 </View>
 
-                {/* Video Controls */}
+                {/* VIDEO CONTROLS TOOLBAR */}
                 <View style={s.videoControlsStrip}>
+                  {/* Progress Timecode & Scrubber */}
                   <View style={s.videoTimeRow}>
                     <Text style={s.videoTimeText}>{formatTime(videoProgress)}</Text>
                     <View style={s.videoProgressBar}>
@@ -429,19 +960,68 @@ export default function LearnScreen() {
                     <Text style={s.videoTimeText}>{formatTime(VIDEO_DURATION)}</Text>
                   </View>
 
+                  {/* Main Action Buttons */}
                   <View style={s.videoBtnRow}>
+                    {/* Prev Chapter */}
+                    <TouchableOpacity
+                      style={[s.videoNavIconBtn, currentSlideIndex === 0 && s.navBtnDisabled]}
+                      disabled={currentSlideIndex === 0}
+                      onPress={() => handleSlideChange(Math.max(0, currentSlideIndex - 1))}
+                    >
+                      <Ionicons name="play-skip-back" size={14} color="#CBD5E1" />
+                    </TouchableOpacity>
+
+                    {/* -10s */}
+                    <TouchableOpacity
+                      style={s.videoNavIconBtn}
+                      onPress={() => setVideoProgress((p) => Math.max(0, p - 10))}
+                    >
+                      <Ionicons name="play-back-outline" size={14} color="#CBD5E1" />
+                    </TouchableOpacity>
+
+                    {/* PLAY / PAUSE BUTTON */}
                     <TouchableOpacity
                       style={s.videoPlayBtn}
-                      onPress={() => setIsPlayingVideo((p) => !p)}
+                      onPress={handleToggleVideoPlay}
                       activeOpacity={0.8}
                     >
+                      <Ionicons
+                        name={isPlayingVideo ? 'pause' : 'play'}
+                        size={15}
+                        color="#FFFFFF"
+                      />
                       <Text style={s.videoPlayBtnText}>
                         {isPlayingVideo ? t.learn.pause : t.learn.play}
                       </Text>
                     </TouchableOpacity>
 
+                    {/* +10s */}
+                    <TouchableOpacity
+                      style={s.videoNavIconBtn}
+                      onPress={() => setVideoProgress((p) => Math.min(VIDEO_DURATION, p + 10))}
+                    >
+                      <Ionicons name="play-forward-outline" size={14} color="#CBD5E1" />
+                    </TouchableOpacity>
+
+                    {/* Next Chapter */}
+                    <TouchableOpacity
+                      style={[
+                        s.videoNavIconBtn,
+                        currentSlideIndex === COURSE_MODULE.slides.length - 1 && s.navBtnDisabled,
+                      ]}
+                      disabled={currentSlideIndex === COURSE_MODULE.slides.length - 1}
+                      onPress={() =>
+                        handleSlideChange(
+                          Math.min(COURSE_MODULE.slides.length - 1, currentSlideIndex + 1)
+                        )
+                      }
+                    >
+                      <Ionicons name="play-skip-forward" size={14} color="#CBD5E1" />
+                    </TouchableOpacity>
+
+                    {/* Quality pills */}
                     <View style={s.qualityRow}>
-                      {['240p', '360p', '720p'].map((q) => (
+                      {['240p', '360p'].map((q) => (
                         <TouchableOpacity
                           key={q}
                           style={[s.miniPill, videoQuality === q && s.miniPillActive]}
@@ -454,12 +1034,13 @@ export default function LearnScreen() {
                       ))}
                     </View>
 
+                    {/* Speed pills */}
                     <View style={s.speedRow}>
                       {['1.0x', '1.25x', '1.5x'].map((sp) => (
                         <TouchableOpacity
                           key={sp}
                           style={[s.miniPill, playbackSpeed === sp && s.miniPillSpeedActive]}
-                          onPress={() => setPlaybackSpeed(sp)}
+                          onPress={() => handleSpeedChange(sp)}
                         >
                           <Text style={[s.miniPillText, playbackSpeed === sp && s.miniPillTextActive]}>
                             {sp}
@@ -472,9 +1053,12 @@ export default function LearnScreen() {
               </View>
 
               <View style={s.zeroBufferingNotice}>
-                <Text style={s.zeroBufferingTitle}>
-                  🚀 {isEnglish ? 'VSMP Zero-Buffering Playback' : 'विद्यासेतु शून्य-बफरिंग तकनीक:'}
-                </Text>
+                <View style={s.zeroBufferingHeader}>
+                  <Ionicons name="flash" size={14} color={theme.primaryLight} />
+                  <Text style={s.zeroBufferingTitle}>
+                    {isEnglish ? 'VSMP Zero-Buffering Playback' : 'विद्यासेतु शून्य-बफरिंग तकनीक'}
+                  </Text>
+                </View>
                 <Text style={s.zeroBufferingText}>
                   {networkState.isOnline
                     ? (isEnglish
@@ -484,71 +1068,6 @@ export default function LearnScreen() {
                         ? 'Offline verified: Running from local .vsmp storage cache (Zero data consumed).'
                         : 'ऑफलाइन मोड: स्थानीय .vsmp कैश से चल रहा है (0 बाइट डेटा खर्च)।')}
                 </Text>
-              </View>
-            </View>
-          )}
-
-          {/* MODE 3: .VSMP SPEC INSPECTOR */}
-          {mediaMode === 'VSMP_INSPECTOR' && (
-            <View style={s.inspectorContainer}>
-              <View style={s.inspectorCard}>
-                <View style={s.inspectorHeaderRow}>
-                  <View>
-                    <Text style={s.inspectorFileTitle}>HIS_BA1_MOD1_INDUS_VALLEY.vsmp</Text>
-                    <Text style={s.inspectorFileSub}>
-                      {isEnglish ? 'VidyaSetu Micro-Pack Container v1.2' : 'विद्यासेतु माइक्रो-पैक कंटेनर प्रारूप'}
-                    </Text>
-                  </View>
-                  <View style={s.integrityBadge}>
-                    <Text style={s.integrityBadgeText}>✓ SHA-256 OK</Text>
-                  </View>
-                </View>
-
-                <View style={s.specGrid}>
-                  <View style={s.specItem}>
-                    <Text style={s.specLabel}>{isEnglish ? 'Pack Size' : 'पैक आकार'}</Text>
-                    <Text style={s.specValue}>1.84 MB (1,934,200 B)</Text>
-                  </View>
-                  <View style={s.specItem}>
-                    <Text style={s.specLabel}>{isEnglish ? 'Audio Codec' : 'ऑडियो कोडेक'}</Text>
-                    <Text style={s.specValue}>libopus @ 14 kbps CBR</Text>
-                  </View>
-                  <View style={s.specItem}>
-                    <Text style={s.specLabel}>{isEnglish ? 'Languages' : 'शामिल भाषाएं'}</Text>
-                    <Text style={s.specValue}>6 (EN, HI, NIM, MAL, BUN, BHI)</Text>
-                  </View>
-                  <View style={s.specItem}>
-                    <Text style={s.specLabel}>{isEnglish ? 'Offline Storage' : 'ऑफलाइन स्टोरेज'}</Text>
-                    <Text style={[s.specValue, { color: theme.successText }]}>✓ Permanently Cached</Text>
-                  </View>
-                  <View style={s.specItem}>
-                    <Text style={s.specLabel}>{isEnglish ? 'Compression Ratio' : 'कंप्रेशन अनुपात'}</Text>
-                    <Text style={s.specValue}>18:1 vs MP3 / 94% Savings</Text>
-                  </View>
-                  <View style={s.specItem}>
-                    <Text style={s.specLabel}>{isEnglish ? 'Min Bandwidth' : 'न्यूनतम बैंडविड्थ'}</Text>
-                    <Text style={s.specValue}>0 kbps (Full Offline)</Text>
-                  </View>
-                </View>
-
-                <View style={s.hashContainer}>
-                  <Text style={s.hashLabel}>SHA-256 Checksum Signature:</Text>
-                  <Text style={s.hashValue}>{COURSE_MODULE.checksum}</Text>
-                </View>
-
-                <View style={s.cuesContainer}>
-                  <Text style={s.cuesTitle}>
-                    {isEnglish ? 'Synchronized Cue Points in Container:' : 'कंटेनर में सिंक्रनाइज़्ड क्यू पॉइंट्स:'}
-                  </Text>
-                  {COURSE_MODULE.timelineCues.map((cue) => (
-                    <View key={cue.cueId} style={s.cueRow}>
-                      <Text style={s.cueTime}>{cue.startTimeSec}s - {cue.endTimeSec}s</Text>
-                      <Text style={s.cueTopic}>
-                        {isEnglish ? cue.focusTopicEnglish : cue.focusTopicHindi}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
               </View>
             </View>
           )}
@@ -565,34 +1084,41 @@ export default function LearnScreen() {
             </View>
             <View style={s.quizQuestionsBadge}>
               <Text style={s.quizQuestionsBadgeText}>
-                {COURSE_MODULE.quiz.length} {isEnglish ? 'Questions' : 'प्रश्न'}
+                {(COURSE_MODULE?.quiz || []).length} {isEnglish ? 'Questions' : 'प्रश्न'}
               </Text>
             </View>
           </View>
 
           {showResult && (
             <View style={s.resultBanner}>
-              <Text style={s.resultScore}>
-                {score === COURSE_MODULE.quiz.length ? '🏆' : '📝'} {t.learn.scoreCard}:{' '}
-                <Text style={s.resultScoreBold}>{score}/{COURSE_MODULE.quiz.length}</Text>
-              </Text>
+              <View style={s.scoreRow}>
+                <Ionicons
+                  name={score === (COURSE_MODULE?.quiz || []).length ? 'trophy-outline' : 'ribbon-outline'}
+                  size={20}
+                  color={theme.successText}
+                />
+                <Text style={s.resultScore}>
+                  {t.learn.scoreCard}:{' '}
+                  <Text style={s.resultScoreBold}>{score}/{(COURSE_MODULE?.quiz || []).length}</Text>
+                </Text>
+              </View>
               <Text style={s.resultMsg}>
-                {score === COURSE_MODULE.quiz.length
+                {score === (COURSE_MODULE?.quiz || []).length
                   ? (isEnglish ? 'Outstanding! You have mastered this chapter.' : 'शानदार! आप इस अध्याय में पारंगत हैं।')
                   : (isEnglish ? 'Good effort! Review the detailed solutions below.' : 'पुनः प्रयास करें — सही उत्तर नीचे देखें।')}
               </Text>
             </View>
           )}
 
-          {COURSE_MODULE.quiz.map((q, idx) => {
+          {(COURSE_MODULE?.quiz || []).map((q, idx) => {
             const qText = isEnglish ? q.questionEn : q.question;
-            const optionsList = isEnglish ? q.optionsEn : q.options;
+            const optionsList = (isEnglish ? q.optionsEn : q.options) || [];
             const expText = isEnglish ? q.explanationEn : q.explanation;
 
             return (
               <View key={q.id} style={s.quizItem}>
                 <Text style={s.quizQ}>{idx + 1}. {qText}</Text>
-                {optionsList.map((opt, oi) => {
+                {(optionsList || []).map((opt, oi) => {
                   const isSelected = selectedAnswers[q.id] === oi;
                   const isCorrect = showResult && oi === q.correctIndex;
                   const isWrong = showResult && isSelected && oi !== q.correctIndex;
@@ -622,9 +1148,15 @@ export default function LearnScreen() {
                             isWrong && s.radioCircleWrong,
                           ]}
                         >
-                          <Text style={s.radioIndexText}>
-                            {isEnglish ? ['A', 'B', 'C', 'D'][oi] : ['क', 'ख', 'ग', 'घ'][oi]}
-                          </Text>
+                          {showResult && isCorrect ? (
+                            <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                          ) : showResult && isWrong ? (
+                            <Ionicons name="close" size={13} color="#FFFFFF" />
+                          ) : (
+                            <Text style={s.radioIndexText}>
+                              {isEnglish ? ['A', 'B', 'C', 'D'][oi] : ['क', 'ख', 'ग', 'घ'][oi]}
+                            </Text>
+                          )}
                         </View>
                         <Text
                           style={[
@@ -643,11 +1175,14 @@ export default function LearnScreen() {
 
                 {showResult && (
                   <View style={s.explanationBox}>
-                    <Text style={s.explanationText}>
-                      {t.learn.correctAnswer}:{' '}
-                      {isEnglish ? ['A', 'B', 'C', 'D'][q.correctIndex] : ['क', 'ख', 'ग', 'घ'][q.correctIndex]}
-                      {'\n'}📖 {expText}
-                    </Text>
+                    <View style={s.explanationHeader}>
+                      <Ionicons name="book-outline" size={13} color={theme.successText} />
+                      <Text style={s.explanationAnswerTag}>
+                        {t.learn.correctAnswer}:{' '}
+                        {isEnglish ? ['A', 'B', 'C', 'D'][q.correctIndex] : ['क', 'ख', 'ग', 'घ'][q.correctIndex]}
+                      </Text>
+                    </View>
+                    <Text style={s.explanationText}>{expText}</Text>
                   </View>
                 )}
               </View>
@@ -684,7 +1219,7 @@ const makeStyles = (theme, isTablet) =>
     },
     content: {
       padding: SPACING.md,
-      paddingBottom: 90,
+      paddingBottom: 95,
       alignItems: 'center',
     },
     adaptiveWrapper: {
@@ -695,59 +1230,67 @@ const makeStyles = (theme, isTablet) =>
     // Module Card
     moduleCard: {
       backgroundColor: theme.surface,
-      borderRadius: RADIUS.lg,
+      borderRadius: RADIUS.xl,
       padding: isTablet ? SPACING.lg : SPACING.md,
       marginBottom: SPACING.md,
       borderWidth: 1,
       borderColor: theme.surfaceBorder,
-      elevation: 3,
+      elevation: 4,
       shadowColor: theme.cardShadow,
-      shadowOffset: { width: 0, height: 3 },
+      shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 1,
-      shadowRadius: 8,
+      shadowRadius: 10,
     },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 8,
+      marginBottom: 10,
       flexWrap: 'wrap',
       gap: 6,
     },
     vsmpBadge: {
-      backgroundColor: '#064E3B',
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
       paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-      borderWidth: 0.5,
-      borderColor: '#10B981',
+      paddingVertical: 3.5,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.35)',
+      gap: 4,
     },
     vsmpBadgeText: {
-      color: '#A7F3D0',
-      fontSize: 10.5,
-      fontWeight: FONT.weights.extrabold,
-      letterSpacing: 0.3,
+      color: '#34D399',
+      fontSize: 10,
+      fontWeight: FONT.weights.black,
+      letterSpacing: 0.4,
     },
     degreeBadge: {
       backgroundColor: theme.primarySoft,
       paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-      borderWidth: 0.5,
+      paddingVertical: 3.5,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
       borderColor: theme.primaryBorder,
     },
     degreeBadgeText: {
-      color: theme.primary,
-      fontSize: 10.5,
+      color: theme.primaryLight,
+      fontSize: 10,
       fontWeight: FONT.weights.bold,
     },
     offlineReadyBadge: {
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-      paddingHorizontal: 7,
-      paddingVertical: 3,
-      borderRadius: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+      paddingHorizontal: 8,
+      paddingVertical: 3.5,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+      gap: 4,
     },
     offlineReadyText: {
-      fontSize: 10,
+      fontSize: 9.5,
       color: theme.textMuted,
       fontWeight: FONT.weights.semibold,
     },
@@ -755,14 +1298,21 @@ const makeStyles = (theme, isTablet) =>
       fontSize: isTablet ? FONT.sizes.xxl : FONT.sizes.xl,
       fontWeight: FONT.weights.extrabold,
       color: theme.textPrimary,
-      lineHeight: isTablet ? 32 : 27,
+      lineHeight: isTablet ? 32 : 28,
+      letterSpacing: 0.2,
       marginTop: 2,
+    },
+    universityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 4,
+      marginBottom: SPACING.md,
     },
     moduleSubtitle: {
       fontSize: FONT.sizes.xs,
       color: theme.textMuted,
-      marginTop: 4,
-      marginBottom: SPACING.md,
+      fontWeight: FONT.weights.medium,
     },
 
     // Mode Toggle
@@ -777,21 +1327,24 @@ const makeStyles = (theme, isTablet) =>
     },
     modeBtn: {
       flex: 1,
-      paddingVertical: 9,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      paddingVertical: 8,
       alignItems: 'center',
       borderRadius: RADIUS.sm,
+      gap: 5,
     },
     modeBtnActive: {
       backgroundColor: theme.chromeBackground,
       elevation: 3,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
+      shadowOpacity: 0.3,
       shadowRadius: 4,
     },
     modeBtnText: {
       fontSize: FONT.sizes.xs,
-      fontWeight: FONT.weights.bold,
+      fontWeight: FONT.weights.semibold,
       color: theme.textMuted,
     },
     modeBtnTextActive: {
@@ -799,28 +1352,31 @@ const makeStyles = (theme, isTablet) =>
       fontWeight: FONT.weights.extrabold,
     },
 
-    // Stepper
+    // Slide Player
+    slidePlayerContainer: {
+      gap: 10,
+    },
     stepperRow: {
       flexDirection: 'row',
       gap: 6,
-      marginBottom: 10,
+      marginBottom: 6,
     },
     stepTab: {
       flex: 1,
       paddingVertical: 6,
       paddingHorizontal: 8,
-      borderRadius: 8,
+      borderRadius: RADIUS.sm,
       backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
       borderColor: theme.surfaceBorder,
       alignItems: 'center',
     },
     stepTabActive: {
-      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
       borderColor: theme.primaryLight,
     },
     stepNum: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: FONT.weights.extrabold,
       color: theme.textMuted,
     },
@@ -828,7 +1384,7 @@ const makeStyles = (theme, isTablet) =>
       color: theme.primaryLight,
     },
     stepLabel: {
-      fontSize: 10,
+      fontSize: 9.5,
       color: theme.textMuted,
       marginTop: 1,
     },
@@ -840,54 +1396,55 @@ const makeStyles = (theme, isTablet) =>
     // Canvas
     canvas: {
       backgroundColor: theme.surfaceAlt,
-      borderRadius: RADIUS.md,
+      borderRadius: RADIUS.lg,
       padding: isTablet ? SPACING.lg : SPACING.md,
       borderWidth: 1,
       borderColor: theme.surfaceBorder,
-      marginBottom: SPACING.sm,
+      marginBottom: SPACING.xs,
     },
     canvasHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
       marginBottom: SPACING.sm,
+      gap: 8,
     },
     canvasTitleGroup: {
       flex: 1,
-      paddingRight: 6,
     },
     canvasSlideTitle: {
       fontSize: FONT.sizes.base,
       fontWeight: FONT.weights.extrabold,
       color: theme.textPrimary,
-      lineHeight: 22,
+      lineHeight: 20,
     },
     canvasSlideSubtitle: {
-      fontSize: FONT.sizes.xs,
+      fontSize: 10.5,
       color: theme.textMuted,
       marginTop: 2,
     },
     vectorTag: {
-      backgroundColor: theme.primarySoft,
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
       paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: 4,
+      paddingVertical: 2,
+      borderRadius: RADIUS.xs,
       borderWidth: 0.5,
-      borderColor: theme.primaryBorder,
+      borderColor: theme.primaryLight,
     },
     vectorTagText: {
-      fontSize: 9,
+      fontSize: 8.5,
       fontWeight: FONT.weights.extrabold,
-      color: theme.primary,
+      color: theme.primaryLight,
+      letterSpacing: 0.4,
     },
 
-    // Blueprint Diagram
+    // Blueprint Box
     blueprintBox: {
-      backgroundColor: theme.chromeBackground,
-      borderRadius: RADIUS.sm,
+      backgroundColor: '#090F1E',
+      borderRadius: RADIUS.md,
       padding: SPACING.md,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.12)',
+      borderColor: 'rgba(56, 189, 248, 0.25)',
       alignItems: 'center',
     },
     diagramContent: {
@@ -895,10 +1452,10 @@ const makeStyles = (theme, isTablet) =>
       alignItems: 'center',
     },
     diagramHeader: {
-      fontSize: 11,
-      fontWeight: FONT.weights.extrabold,
+      fontSize: 10,
       color: '#38BDF8',
-      letterSpacing: 0.5,
+      fontWeight: FONT.weights.extrabold,
+      letterSpacing: 0.8,
       marginBottom: 10,
     },
     gridGraphic: {
@@ -908,62 +1465,68 @@ const makeStyles = (theme, isTablet) =>
     },
     citadelPill: {
       width: '92%',
-      backgroundColor: 'rgba(59, 130, 246, 0.25)',
-      padding: 8,
-      borderRadius: 8,
+      backgroundColor: 'rgba(30, 58, 138, 0.4)',
+      padding: 10,
+      borderRadius: RADIUS.sm,
       borderWidth: 1,
-      borderColor: 'rgba(59, 130, 246, 0.5)',
+      borderColor: '#3B82F6',
       alignItems: 'center',
     },
+    pillIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
     citadelTitle: {
-      fontSize: 12,
-      fontWeight: FONT.weights.bold,
+      fontSize: 11.5,
+      fontWeight: FONT.weights.extrabold,
       color: '#93C5FD',
     },
     citadelDesc: {
       fontSize: 10,
-      color: '#E0F2FE',
-      marginTop: 1,
+      color: '#DBEAFE',
+      marginTop: 2,
     },
     crossStreetRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      width: '80%',
+      width: '85%',
+      justifyContent: 'center',
       gap: 8,
       marginVertical: 2,
     },
     streetLineH: {
       flex: 1,
-      height: 2,
-      backgroundColor: theme.primaryLight,
+      height: 1,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
     angleTag: {
-      fontSize: 9,
-      fontWeight: FONT.weights.bold,
+      fontSize: 9.5,
       color: '#FBBF24',
-      backgroundColor: 'rgba(245, 158, 11, 0.25)',
+      fontWeight: FONT.weights.bold,
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
       paddingHorizontal: 6,
-      paddingVertical: 1,
+      paddingVertical: 1.5,
       borderRadius: 4,
     },
     lowerTownPill: {
       width: '92%',
-      backgroundColor: 'rgba(16, 185, 129, 0.22)',
-      padding: 8,
-      borderRadius: 8,
+      backgroundColor: 'rgba(6, 78, 59, 0.35)',
+      padding: 10,
+      borderRadius: RADIUS.sm,
       borderWidth: 1,
-      borderColor: 'rgba(16, 185, 129, 0.5)',
+      borderColor: 'rgba(16, 185, 129, 0.4)',
       alignItems: 'center',
     },
     lowerTownTitle: {
-      fontSize: 12,
-      fontWeight: FONT.weights.bold,
+      fontSize: 11.5,
+      fontWeight: FONT.weights.extrabold,
       color: '#6EE7B7',
     },
     lowerTownDesc: {
       fontSize: 10,
-      color: '#ECFDF5',
-      marginTop: 1,
+      color: '#D1FAE5',
+      marginTop: 2,
     },
 
     // Bath Graphic
@@ -973,35 +1536,38 @@ const makeStyles = (theme, isTablet) =>
       gap: 4,
     },
     bathStairText: {
-      fontSize: 10,
+      fontSize: 9.5,
       color: '#94A3B8',
       fontWeight: FONT.weights.semibold,
     },
     bathReservoir: {
       width: '100%',
-      backgroundColor: 'rgba(14, 116, 144, 0.35)',
+      backgroundColor: 'rgba(14, 116, 144, 0.3)',
       borderWidth: 1.5,
       borderColor: '#06B6D4',
-      borderRadius: 10,
+      borderRadius: RADIUS.md,
       padding: 12,
       alignItems: 'center',
     },
     bathPoolText: {
-      fontSize: 13,
+      fontSize: 12.5,
       fontWeight: FONT.weights.extrabold,
       color: '#67E8F9',
     },
     bitumenBadge: {
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 6,
       marginTop: 6,
       borderWidth: 0.5,
       borderColor: '#F59E0B',
+      gap: 4,
     },
     bitumenBadgeText: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: FONT.weights.bold,
       color: '#FDE68A',
     },
@@ -1018,52 +1584,52 @@ const makeStyles = (theme, isTablet) =>
       borderWidth: 1,
       borderColor: '#3B82F6',
       padding: 6,
-      borderRadius: 6,
+      borderRadius: RADIUS.xs,
       alignItems: 'center',
     },
     riverText: {
-      fontSize: 11,
+      fontSize: 10.5,
       fontWeight: FONT.weights.bold,
       color: '#93C5FD',
     },
     lockGateBox: {
-      backgroundColor: 'rgba(217, 119, 6, 0.3)',
+      backgroundColor: 'rgba(217, 119, 6, 0.25)',
       borderWidth: 1,
       borderColor: theme.primaryLight,
-      paddingHorizontal: 10,
+      paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 4,
     },
     lockGateText: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: FONT.weights.bold,
       color: '#FDE68A',
     },
     dockBasin: {
       width: '100%',
-      backgroundColor: 'rgba(15, 23, 42, 0.8)',
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
       borderWidth: 1.5,
-      borderColor: '#CBD5E1',
-      borderRadius: 8,
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+      borderRadius: RADIUS.sm,
       padding: 8,
       alignItems: 'center',
     },
     dockBasinTitle: {
-      fontSize: 12,
+      fontSize: 11.5,
       fontWeight: FONT.weights.bold,
       color: '#F8FAFC',
     },
     tradeRouteText: {
-      fontSize: 10,
+      fontSize: 9.5,
       color: '#94A3B8',
       marginTop: 2,
     },
     canvasDesc: {
-      fontSize: 11,
+      fontSize: 10.5,
       color: '#94A3B8',
       textAlign: 'center',
       marginTop: 8,
-      lineHeight: 16,
+      lineHeight: 15,
     },
 
     // Bullets
@@ -1074,52 +1640,55 @@ const makeStyles = (theme, isTablet) =>
     bulletRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      gap: 6,
+      gap: 8,
     },
     bulletDot: {
-      fontSize: 9,
-      color: theme.primaryLight,
-      marginTop: 3,
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor: theme.primaryLight,
+      marginTop: 6,
     },
     bulletItem: {
       flex: 1,
-      fontSize: FONT.sizes.sm,
+      fontSize: FONT.sizes.xs + 1,
       color: theme.textSecondary,
-      lineHeight: 20,
+      lineHeight: 19,
     },
 
     // Transcript Box
     transcriptBox: {
       backgroundColor: theme.surface,
-      borderRadius: RADIUS.sm,
+      borderRadius: RADIUS.md,
       padding: SPACING.md,
       marginTop: SPACING.md,
       borderLeftWidth: 3.5,
-      borderLeftColor: theme.primary,
+      borderLeftColor: theme.primaryLight,
       borderWidth: 1,
-      borderColor: theme.surfaceBorderAlt,
+      borderColor: theme.surfaceBorder,
     },
     transcriptHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
+      gap: 6,
       marginBottom: 4,
     },
-    transcriptIcon: {
-      fontSize: 13,
-    },
     transcriptLabel: {
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: FONT.weights.extrabold,
-      color: theme.primary,
+      color: theme.primaryLight,
+      letterSpacing: 0.3,
     },
     transcriptText: {
-      fontSize: FONT.sizes.sm,
+      fontSize: FONT.sizes.xs + 0.5,
       color: theme.textPrimary,
       fontStyle: 'italic',
-      lineHeight: 20,
+      lineHeight: 18,
     },
     glossaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       marginTop: 8,
       paddingTop: 6,
       borderTopWidth: 1,
@@ -1128,55 +1697,105 @@ const makeStyles = (theme, isTablet) =>
     glossaryLabel: {
       fontSize: 10,
       fontWeight: FONT.weights.bold,
-      color: theme.textMuted,
+      color: theme.primaryLight,
     },
     glossaryText: {
-      fontSize: 11,
-      color: theme.textSecondary,
-      marginTop: 1,
+      fontSize: 10.5,
+      color: theme.textMuted,
+      flex: 1,
     },
 
     // Audio Controls
     audioControls: {
-      marginTop: SPACING.sm,
+      backgroundColor: theme.surfaceAlt,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.md,
+      borderWidth: 1,
+      borderColor: theme.surfaceBorder,
     },
     timeRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: SPACING.sm,
+      marginBottom: 10,
     },
     timeText: {
-      fontSize: 11,
+      fontSize: 10,
       color: theme.textMuted,
       fontWeight: FONT.weights.semibold,
-      width: 40,
+      width: 36,
       textAlign: 'center',
     },
     trackBar: {
       flex: 1,
-      height: 7,
+      height: 6,
       backgroundColor: theme.surfaceBorder,
-      borderRadius: 4,
+      borderRadius: 3,
       marginHorizontal: 8,
       overflow: 'hidden',
     },
     trackFill: {
       height: '100%',
-      backgroundColor: '#0D5C3A',
-      borderRadius: 4,
+      backgroundColor: theme.primaryLight,
+      borderRadius: 3,
     },
     audioBtns: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
     },
-    navBtn: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      backgroundColor: theme.surfaceAlt,
+    audioEqRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      gap: 4,
+      height: 24,
+      marginVertical: 6,
+    },
+    audioEqBar: {
+      width: 4,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderRadius: 2,
+    },
+    audioJumpBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      backgroundColor: theme.surface,
       borderRadius: RADIUS.sm,
       borderWidth: 1,
-      borderColor: theme.surfaceBorderAlt,
+      borderColor: theme.surfaceBorder,
+    },
+    audioJumpText: {
+      fontSize: 10,
+      color: theme.textSecondary,
+      fontWeight: FONT.weights.bold,
+    },
+    audioSpeedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 10,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.surfaceBorder,
+    },
+    audioSpeedLabel: {
+      fontSize: 10,
+      color: theme.textMuted,
+      fontWeight: FONT.weights.semibold,
+    },
+    navBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      backgroundColor: theme.surface,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: theme.surfaceBorder,
     },
     navBtnDisabled: {
       opacity: 0.4,
@@ -1187,19 +1806,22 @@ const makeStyles = (theme, isTablet) =>
       color: theme.textSecondary,
     },
     playBtn: {
-      backgroundColor: '#0D5C3A',
-      paddingHorizontal: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.primary,
+      paddingHorizontal: 22,
       paddingVertical: 9,
       borderRadius: RADIUS.pill,
-      elevation: 3,
-      shadowColor: '#0D5C3A',
+      elevation: 4,
+      shadowColor: theme.primaryLight,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.4,
-      shadowRadius: 5,
+      shadowRadius: 6,
+      gap: 6,
     },
     playBtnText: {
       color: '#FFFFFF',
-      fontSize: FONT.sizes.sm,
+      fontSize: FONT.sizes.xs + 1,
       fontWeight: FONT.weights.extrabold,
     },
 
@@ -1209,135 +1831,496 @@ const makeStyles = (theme, isTablet) =>
     },
     videoPlayerCard: {
       backgroundColor: '#070D1B',
-      borderRadius: RADIUS.md,
+      borderRadius: RADIUS.lg,
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.12)',
+      borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     videoTopBar: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: SPACING.sm,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      paddingHorizontal: SPACING.sm + 2,
+      paddingVertical: 8,
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
       borderBottomWidth: 1,
       borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     },
     videoBrandBadge: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 6,
+    },
+    recDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: '#64748B',
+    },
+    recDotLive: {
+      backgroundColor: '#EF4444',
     },
     videoBrandText: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: FONT.weights.extrabold,
       color: '#94A3B8',
       letterSpacing: 0.5,
     },
+    videoBrandTextLive: {
+      color: '#FCA5A5',
+    },
+    videoMetaRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
     vsmpStreamPill: {
-      backgroundColor: 'rgba(245, 158, 11, 0.2)',
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
       borderWidth: 0.8,
       borderColor: theme.primaryLight,
       paddingHorizontal: 7,
       paddingVertical: 2,
-      borderRadius: 4,
+      borderRadius: RADIUS.xs,
     },
     vsmpStreamText: {
+      fontSize: 8.5,
+      fontWeight: FONT.weights.bold,
+      color: '#FDE68A',
+    },
+    slideCountPill: {
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: RADIUS.xs,
+    },
+    slideCountText: {
+      fontSize: 8.5,
+      color: '#CBD5E1',
+      fontWeight: FONT.weights.bold,
+    },
+
+    // 16:9 Cinema Stage & Stage Graphics
+    cinemaStage: {
+      width: '100%',
+      minHeight: 250,
+      backgroundColor: '#060B17',
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    stageTopicBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    stageTopicTitle: {
+      fontSize: 11,
+      fontWeight: FONT.weights.extrabold,
+      color: '#38BDF8',
+      letterSpacing: 0.3,
+    },
+    cinemaCanvasArea: {
+      width: '100%',
+      padding: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 180,
+    },
+    videoDiagram: {
+      width: '100%',
+      alignItems: 'center',
+    },
+    videoDiagramTitle: {
+      fontSize: 9.5,
+      fontWeight: FONT.weights.black,
+      color: '#94A3B8',
+      letterSpacing: 0.8,
+      marginBottom: 8,
+    },
+    videoGridGraphic: {
+      width: '100%',
+      alignItems: 'center',
+      gap: 6,
+    },
+    videoSectorCard: {
+      width: '96%',
+      padding: 8,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    citadelVideoCard: {
+      backgroundColor: 'rgba(30, 58, 138, 0.35)',
+      borderColor: '#3B82F6',
+    },
+    citadelVideoTitle: {
+      fontSize: 11,
+      fontWeight: FONT.weights.extrabold,
+      color: '#93C5FD',
+    },
+    streetVideoCard: {
+      backgroundColor: 'rgba(15, 23, 42, 0.6)',
+      borderColor: 'rgba(255, 255, 255, 0.15)',
+      alignItems: 'center',
+    },
+    lowerTownVideoCard: {
+      backgroundColor: 'rgba(6, 78, 59, 0.35)',
+      borderColor: 'rgba(16, 185, 129, 0.4)',
+    },
+    lowerTownVideoTitle: {
+      fontSize: 11,
+      fontWeight: FONT.weights.extrabold,
+      color: '#6EE7B7',
+    },
+    videoSectorDesc: {
+      fontSize: 9.5,
+      color: '#CBD5E1',
+      marginTop: 2,
+    },
+    videoSectorActive: {
+      borderColor: '#F59E0B',
+      backgroundColor: 'rgba(245, 158, 11, 0.18)',
+      borderWidth: 1.5,
+    },
+    angleBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    laserMarker: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(239, 68, 68, 0.25)',
+      paddingHorizontal: 5,
+      paddingVertical: 1.5,
+      borderRadius: 4,
+      marginLeft: 'auto',
+    },
+    laserMarkerCenter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(239, 68, 68, 0.25)',
+      paddingHorizontal: 6,
+      paddingVertical: 1.5,
+      borderRadius: 4,
+      marginTop: 4,
+    },
+    laserDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#EF4444',
+    },
+    laserText: {
+      fontSize: 8,
+      fontWeight: FONT.weights.black,
+      color: '#FCA5A5',
+      letterSpacing: 0.5,
+    },
+    videoBathGraphic: {
+      width: '96%',
+      alignItems: 'center',
+      gap: 4,
+    },
+    videoStairText: {
+      fontSize: 9,
+      color: '#94A3B8',
+      fontWeight: FONT.weights.semibold,
+    },
+    videoPoolReservoir: {
+      width: '100%',
+      backgroundColor: 'rgba(14, 116, 144, 0.3)',
+      borderWidth: 1.5,
+      borderColor: '#06B6D4',
+      borderRadius: RADIUS.sm,
+      padding: 8,
+      alignItems: 'center',
+    },
+    videoPoolDimensions: {
+      fontSize: 12,
+      fontWeight: FONT.weights.extrabold,
+      color: '#67E8F9',
+    },
+    waterRippleBar: {
+      flexDirection: 'row',
+      gap: 4,
+      marginVertical: 4,
+    },
+    rippleWave: {
+      width: 24,
+      height: 2,
+      backgroundColor: '#38BDF8',
+      borderRadius: 1,
+    },
+    videoBitumenPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 4,
+      marginTop: 4,
+      borderWidth: 0.5,
+      borderColor: '#F59E0B',
+    },
+    videoBitumenText: {
       fontSize: 9,
       fontWeight: FONT.weights.bold,
       color: '#FDE68A',
     },
-    stageArea: {
-      padding: SPACING.md,
+    videoDockGraphic: {
+      width: '96%',
       alignItems: 'center',
+      gap: 6,
     },
-    facultyTag: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(30, 41, 59, 0.85)',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: RADIUS.pill,
+    videoRiverCard: {
+      width: '100%',
+      backgroundColor: 'rgba(37, 99, 235, 0.25)',
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.15)',
-      marginBottom: 10,
+      borderColor: '#3B82F6',
+      padding: 6,
+      borderRadius: RADIUS.xs,
+      alignItems: 'center',
     },
-    facultyEmoji: {
-      fontSize: 14,
-      marginRight: 6,
+    videoRiverTitle: {
+      fontSize: 10,
+      fontWeight: FONT.weights.bold,
+      color: '#93C5FD',
     },
-    facultyTitle: {
+    videoLockGate: {
+      width: '92%',
+      backgroundColor: 'rgba(217, 119, 6, 0.25)',
+      borderWidth: 1,
+      borderColor: theme.primaryLight,
+      padding: 5,
+      borderRadius: 4,
+      alignItems: 'center',
+    },
+    videoLockGateTitle: {
+      fontSize: 9.5,
+      fontWeight: FONT.weights.bold,
+      color: '#FDE68A',
+    },
+    videoBasinCard: {
+      width: '100%',
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      borderWidth: 1.5,
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+      borderRadius: RADIUS.sm,
+      padding: 7,
+      alignItems: 'center',
+    },
+    videoBasinTitle: {
       fontSize: 11,
       fontWeight: FONT.weights.bold,
       color: '#F8FAFC',
     },
-    smartBoard: {
-      width: '100%',
-      backgroundColor: '#0F172A',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#38BDF8',
-      padding: SPACING.md,
-      alignItems: 'center',
-    },
-    boardTopic: {
-      fontSize: 11,
-      fontWeight: FONT.weights.extrabold,
-      color: '#38BDF8',
-      marginBottom: 8,
-    },
-    boardGraphicFrame: {
-      alignItems: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.35)',
-      padding: 10,
-      borderRadius: 6,
-      width: '100%',
-    },
-    boardGraphicEmoji: {
-      fontSize: 22,
-      marginBottom: 4,
-    },
-    boardGraphicMain: {
-      fontSize: 13,
-      fontWeight: FONT.weights.bold,
-      color: '#FBBF24',
-      textAlign: 'center',
-    },
-    boardGraphicSub: {
-      fontSize: 9.5,
-      color: '#64748B',
+    videoTradeRoute: {
+      fontSize: 9,
+      color: '#94A3B8',
       marginTop: 2,
     },
-    subtitleContainer: {
-      backgroundColor: 'rgba(0, 0, 0, 0.75)',
-      marginHorizontal: SPACING.sm,
-      marginBottom: SPACING.sm,
-      padding: SPACING.sm,
+
+    // Faculty PIP (Picture in Picture)
+    facultyPipCard: {
+      position: 'absolute',
+      bottom: 8,
+      right: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(15, 23, 42, 0.94)',
+      borderWidth: 1,
+      borderColor: 'rgba(56, 189, 248, 0.45)',
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: RADIUS.sm,
+      zIndex: 10,
+    },
+    pipAvatarWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(59, 130, 246, 0.25)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+    },
+    pipMicBadge: {
+      position: 'absolute',
+      bottom: -2,
+      right: -2,
+      width: 12,
+      height: 12,
       borderRadius: 6,
-      borderLeftWidth: 3,
-      borderLeftColor: theme.primaryLight,
+      backgroundColor: '#64748B',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pipMicBadgeActive: {
+      backgroundColor: '#10B981',
+    },
+    pipInfo: {
+      justifyContent: 'center',
+    },
+    pipStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    liveDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor: '#64748B',
+    },
+    liveDotActive: {
+      backgroundColor: '#EF4444',
+    },
+    pipLiveText: {
+      fontSize: 7.5,
+      fontWeight: FONT.weights.black,
+      color: '#94A3B8',
+      letterSpacing: 0.3,
+    },
+    pipLiveTextActive: {
+      color: '#FCA5A5',
+    },
+    pipNameText: {
+      fontSize: 9.5,
+      fontWeight: FONT.weights.extrabold,
+      color: '#FFFFFF',
+    },
+    pipEqRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 2,
+      marginTop: 2,
+      height: 14,
+    },
+    pipEqBar: {
+      width: 2.5,
+      backgroundColor: '#38BDF8',
+      borderRadius: 1.2,
+    },
+
+    // Center Play Overlay
+    centerPlayOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+      zIndex: 5,
+    },
+    centerPlayCircle: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: 'rgba(245, 158, 11, 0.9)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 6,
+    },
+    centerPlayBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: 'rgba(15, 23, 42, 0.88)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: RADIUS.pill,
+      marginTop: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(245, 158, 11, 0.4)',
+    },
+    centerPlayBannerText: {
+      fontSize: 9.5,
+      fontWeight: FONT.weights.bold,
+      color: '#FDE68A',
+    },
+    tapFeedbackOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 5,
+    },
+    tapFeedbackCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(0, 0, 0, 0.75)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    // Subtitles
+    subtitleContainer: {
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      padding: SPACING.sm + 2,
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255, 255, 255, 0.08)',
     },
     subHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 3,
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    ccBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      paddingHorizontal: 5,
+      paddingVertical: 1.5,
+      borderRadius: 3,
     },
     subTag: {
-      fontSize: 9,
-      fontWeight: FONT.weights.extrabold,
-      color: theme.primaryLight,
+      fontSize: 8.5,
+      fontWeight: FONT.weights.black,
+      color: '#F59E0B',
+    },
+    subSyncRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
     },
     subSyncText: {
-      fontSize: 8.5,
-      color: '#94A3B8',
+      fontSize: 9,
+      color: '#64748B',
     },
     subtitleLine: {
-      fontSize: 12,
+      fontSize: 11.5,
       color: '#FFFFFF',
-      lineHeight: 18,
+      lineHeight: 16,
+      fontStyle: 'italic',
     },
+
+    // Video Controls
     videoControlsStrip: {
-      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-      padding: SPACING.sm,
+      backgroundColor: '#070D1B',
+      padding: SPACING.sm + 2,
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255, 255, 255, 0.08)',
     },
     videoTimeRow: {
       flexDirection: 'row',
@@ -1345,7 +2328,7 @@ const makeStyles = (theme, isTablet) =>
       marginBottom: 8,
     },
     videoTimeText: {
-      fontSize: 10,
+      fontSize: 9.5,
       color: '#94A3B8',
       fontWeight: FONT.weights.semibold,
       width: 36,
@@ -1354,9 +2337,9 @@ const makeStyles = (theme, isTablet) =>
     videoProgressBar: {
       flex: 1,
       height: 5,
-      backgroundColor: '#334155',
-      borderRadius: 3,
-      marginHorizontal: 6,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      borderRadius: 2.5,
+      marginHorizontal: 8,
       overflow: 'hidden',
     },
     videoProgressFill: {
@@ -1368,66 +2351,78 @@ const makeStyles = (theme, isTablet) =>
       justifyContent: 'space-between',
       alignItems: 'center',
     },
+    videoNavIconBtn: {
+      padding: 6,
+      borderRadius: 4,
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    },
     videoPlayBtn: {
-      backgroundColor: '#0D5C3A',
-      paddingHorizontal: 12,
-      paddingVertical: 5,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.primary,
+      paddingHorizontal: 14,
+      paddingVertical: 6,
       borderRadius: RADIUS.pill,
+      gap: 4,
     },
     videoPlayBtnText: {
       color: '#FFFFFF',
-      fontSize: 11,
-      fontWeight: FONT.weights.extrabold,
+      fontSize: 10.5,
+      fontWeight: FONT.weights.bold,
     },
     qualityRow: {
       flexDirection: 'row',
-      gap: 3,
-    },
-    speedRow: {
-      flexDirection: 'row',
-      gap: 3,
+      gap: 4,
     },
     miniPill: {
-      backgroundColor: '#1E293B',
-      paddingHorizontal: 6,
-      paddingVertical: 2.5,
-      borderRadius: 4,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      borderRadius: RADIUS.xs,
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
     },
     miniPillActive: {
       backgroundColor: theme.primary,
     },
     miniPillSpeedActive: {
-      backgroundColor: '#2563EB',
+      backgroundColor: '#0284C7',
     },
     miniPillText: {
-      fontSize: 9.5,
+      fontSize: 9,
       color: '#94A3B8',
       fontWeight: FONT.weights.bold,
     },
     miniPillTextActive: {
       color: '#FFFFFF',
-      fontWeight: FONT.weights.extrabold,
+    },
+    speedRow: {
+      flexDirection: 'row',
+      gap: 4,
     },
     zeroBufferingNotice: {
       backgroundColor: theme.surfaceAlt,
-      borderRadius: RADIUS.sm,
-      padding: SPACING.sm,
-      borderLeftWidth: 3,
-      borderLeftColor: '#0284C7',
+      padding: SPACING.md,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: theme.surfaceBorder,
+    },
+    zeroBufferingHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 3,
     },
     zeroBufferingTitle: {
       fontSize: 11,
       fontWeight: FONT.weights.bold,
-      color: theme.textPrimary,
+      color: theme.primaryLight,
     },
     zeroBufferingText: {
       fontSize: 10.5,
-      color: theme.textSecondary,
-      marginTop: 2,
+      color: theme.textMuted,
       lineHeight: 15,
     },
 
-    // VSMP Inspector
+    // VSMP Spec Inspector
     inspectorContainer: {
       gap: 10,
     },
@@ -1441,31 +2436,37 @@ const makeStyles = (theme, isTablet) =>
     inspectorHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       marginBottom: SPACING.md,
-      paddingBottom: 8,
       borderBottomWidth: 1,
       borderBottomColor: theme.surfaceBorder,
+      paddingBottom: 8,
     },
     inspectorFileTitle: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: FONT.weights.extrabold,
       color: theme.textPrimary,
+      fontFamily: 'monospace',
     },
     inspectorFileSub: {
       fontSize: 10,
       color: theme.textMuted,
-      marginTop: 1,
+      marginTop: 2,
     },
     integrityBadge: {
-      backgroundColor: '#064E3B',
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(16, 185, 129, 0.15)',
       paddingHorizontal: 8,
       paddingVertical: 3,
-      borderRadius: 6,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.35)',
+      gap: 4,
     },
     integrityBadgeText: {
-      fontSize: 10,
-      fontWeight: FONT.weights.extrabold,
+      fontSize: 9.5,
+      fontWeight: FONT.weights.bold,
       color: '#34D399',
     },
     specGrid: {
@@ -1475,38 +2476,39 @@ const makeStyles = (theme, isTablet) =>
       marginBottom: SPACING.md,
     },
     specItem: {
-      flex: 1,
-      minWidth: 130,
+      width: '48%',
       backgroundColor: theme.surface,
       padding: 8,
-      borderRadius: 6,
+      borderRadius: RADIUS.sm,
       borderWidth: 1,
-      borderColor: theme.surfaceBorderAlt,
+      borderColor: theme.surfaceBorder,
     },
     specLabel: {
-      fontSize: 9.5,
+      fontSize: 9,
       color: theme.textMuted,
       fontWeight: FONT.weights.semibold,
     },
     specValue: {
-      fontSize: 11,
+      fontSize: 10.5,
       fontWeight: FONT.weights.bold,
       color: theme.textPrimary,
       marginTop: 2,
     },
     hashContainer: {
-      backgroundColor: theme.chromeBackground,
+      backgroundColor: '#070D1B',
       padding: 8,
-      borderRadius: 6,
+      borderRadius: RADIUS.xs,
       marginBottom: SPACING.md,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.08)',
     },
     hashLabel: {
-      fontSize: 9,
+      fontSize: 8.5,
       color: '#94A3B8',
       fontWeight: FONT.weights.bold,
     },
     hashValue: {
-      fontSize: 9.5,
+      fontSize: 9,
       color: '#38BDF8',
       fontFamily: 'monospace',
       marginTop: 2,
@@ -1515,7 +2517,7 @@ const makeStyles = (theme, isTablet) =>
       gap: 4,
     },
     cuesTitle: {
-      fontSize: 11,
+      fontSize: 10.5,
       fontWeight: FONT.weights.bold,
       color: theme.textPrimary,
       marginBottom: 4,
@@ -1525,31 +2527,35 @@ const makeStyles = (theme, isTablet) =>
       alignItems: 'center',
       backgroundColor: theme.surface,
       padding: 6,
-      borderRadius: 4,
-      borderWidth: 0.5,
-      borderColor: theme.surfaceBorderAlt,
+      borderRadius: RADIUS.xs,
+      borderWidth: 1,
+      borderColor: theme.surfaceBorder,
       gap: 8,
     },
     cueTime: {
-      fontSize: 9.5,
+      fontSize: 9,
       fontWeight: FONT.weights.extrabold,
-      color: theme.primary,
-      width: 60,
+      color: theme.primaryLight,
+      width: 55,
     },
     cueTopic: {
-      fontSize: 10.5,
+      fontSize: 10,
       color: theme.textSecondary,
       flex: 1,
     },
 
-    // Quiz
+    // Practice Quiz
     quizCard: {
       backgroundColor: theme.surface,
-      borderRadius: RADIUS.lg,
+      borderRadius: RADIUS.xl,
       padding: isTablet ? SPACING.lg : SPACING.md,
       borderWidth: 1,
       borderColor: theme.surfaceBorder,
-      elevation: 2,
+      elevation: 3,
+      shadowColor: theme.cardShadow,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
     },
     quizHeaderRow: {
       flexDirection: 'row',
@@ -1566,7 +2572,7 @@ const makeStyles = (theme, isTablet) =>
       color: theme.textPrimary,
     },
     quizSubHeader: {
-      fontSize: 10.5,
+      fontSize: 10,
       color: theme.textMuted,
       marginTop: 2,
     },
@@ -1574,12 +2580,14 @@ const makeStyles = (theme, isTablet) =>
       backgroundColor: theme.primarySoft,
       paddingHorizontal: 8,
       paddingVertical: 3,
-      borderRadius: 6,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      borderColor: theme.primaryBorder,
     },
     quizQuestionsBadgeText: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: FONT.weights.bold,
-      color: theme.primary,
+      color: theme.primaryLight,
     },
     resultBanner: {
       backgroundColor: theme.successSoft,
@@ -1589,6 +2597,11 @@ const makeStyles = (theme, isTablet) =>
       borderWidth: 1,
       borderColor: theme.successBorder,
       alignItems: 'center',
+    },
+    scoreRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
     resultScore: {
       fontSize: FONT.sizes.md,
@@ -1607,7 +2620,7 @@ const makeStyles = (theme, isTablet) =>
       marginBottom: SPACING.md,
     },
     quizQ: {
-      fontSize: FONT.sizes.md,
+      fontSize: FONT.sizes.sm + 1,
       fontWeight: FONT.weights.bold,
       color: theme.textPrimary,
       marginBottom: 8,
@@ -1615,7 +2628,7 @@ const makeStyles = (theme, isTablet) =>
     },
     option: {
       padding: 10,
-      borderRadius: RADIUS.sm,
+      borderRadius: RADIUS.md,
       borderWidth: 1,
       borderColor: theme.surfaceBorder,
       marginBottom: 6,
@@ -1639,9 +2652,9 @@ const makeStyles = (theme, isTablet) =>
       gap: 10,
     },
     radioCircle: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       borderWidth: 1,
       borderColor: theme.surfaceBorderAlt,
       justifyContent: 'center',
@@ -1661,12 +2674,12 @@ const makeStyles = (theme, isTablet) =>
       backgroundColor: theme.error,
     },
     radioIndexText: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: FONT.weights.bold,
       color: theme.textSecondary,
     },
     optionText: {
-      fontSize: FONT.sizes.sm,
+      fontSize: FONT.sizes.xs + 1,
       color: theme.textSecondary,
       flex: 1,
     },
@@ -1684,34 +2697,51 @@ const makeStyles = (theme, isTablet) =>
     },
     explanationBox: {
       backgroundColor: theme.successSoft,
-      padding: SPACING.sm,
+      padding: SPACING.sm + 2,
       borderRadius: RADIUS.sm,
       marginTop: 4,
       borderWidth: 1,
       borderColor: theme.successBorder,
     },
+    explanationHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginBottom: 2,
+    },
+    explanationAnswerTag: {
+      fontSize: 10.5,
+      fontWeight: FONT.weights.extrabold,
+      color: theme.successText,
+    },
     explanationText: {
-      fontSize: 11,
+      fontSize: 10.5,
       color: theme.successText,
       lineHeight: 16,
     },
     submitBtn: {
-      backgroundColor: theme.chromeBackground,
+      backgroundColor: theme.primary,
       paddingVertical: 12,
       borderRadius: RADIUS.md,
       alignItems: 'center',
       marginTop: SPACING.sm,
-      elevation: 2,
+      elevation: 3,
+      shadowColor: theme.primaryLight,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.35,
+      shadowRadius: 5,
     },
     submitBtnSecondary: {
       backgroundColor: 'transparent',
       borderWidth: 1.5,
       borderColor: theme.surfaceBorderAlt,
+      elevation: 0,
+      shadowOpacity: 0,
     },
     submitBtnText: {
       color: '#FFFFFF',
-      fontSize: FONT.sizes.md,
-      fontWeight: FONT.weights.bold,
+      fontSize: FONT.sizes.sm + 1,
+      fontWeight: FONT.weights.extrabold,
     },
     submitBtnTextSecondary: {
       color: theme.textSecondary,

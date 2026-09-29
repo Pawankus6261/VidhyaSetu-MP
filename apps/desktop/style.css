@@ -1,18 +1,18 @@
 :root {
-  --bg-dark: #0A192F;
-  --bg-surface: #0F2342;
-  --bg-card: #142E54;
+  --bg-dark: #080E1C;
+  --bg-surface: #0F182E;
+  --bg-card: #14213D;
   --bg-light: #F8FAFC;
-  --border-dark: #1E3A8A33;
-  --border-color: #233D6B;
-  --text-main: #F1F5F9;
+  --border-dark: rgba(255, 255, 255, 0.06);
+  --border-color: rgba(255, 255, 255, 0.09);
+  --text-main: #F8FAFC;
   --text-muted: #94A3B8;
   --accent-gold: #D97706;
   --accent-amber: #F59E0B;
   --accent-green: #10B981;
   --accent-emerald: #059669;
   --accent-rose: #EF4444;
-  --accent-blue: #3B82F6;
+  --accent-blue: #38BDF8;
   --font-family: 'Outfit', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
