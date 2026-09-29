@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "VidyaSetu MP (विद्यासेतु)",
+    "slug": "vidyasetu-mp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "org.vidyasetu.mp"
+    }
+  }
+}

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>विद्यासेतु MP — प्रशासनिक एवं प्राध्यापक डेस्क</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">MP GOV</div>
+        <h2>विद्यासेतु MP</h2>
+        <p class="brand-tagline">कमांड स्टूडियो • उच्च शिक्षा विभाग</p>
+      </div>
+
+      <div class="college-info-card">
+        <span class="pulse-dot"></span>
+        <div>
+          <div class="college-name">शासकीय अग्रणी महाविद्यालय</div>
+          <div class="district-badge">बड़वानी (निमाड़ संभाग)</div>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="tab-scholarships">
+          <span class="icon">🏛</span>
+          <span>MPTAAS छात्रवृत्ति ऑडिट</span>
+          <span class="badge-count" id="mptaas-count">3</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-doubts">
+          <span class="icon">🎓</span>
+          <span>प्राध्यापक संदेह निवारण</span>
+          <span class="badge-count" id="doubt-count">2</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-compiler">
+          <span class="icon">📦</span>
+          <span>.VSMP पैक कंपाइलर</span>
+          <span class="badge-studio">स्टूडियो</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span>स्थानीय नोडल सर्वर: 10.42.1.8</span>
+        </div>
+        <div class="version-tag">VidyaSetu Engine v2.4 (2026)</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- TOP BAR -->
+      <header class="top-bar">
+        <div class="view-title-box">
+          <h1 id="view-title">MPTAAS छात्रवृत्ति नोडल अधिकारी ऑडिट डेस्क</h1>
+          <p id="view-description">आदिवासी एवं ग्रामीण विद्यार्थियों के आधार-समग्र विसंगति समाधान एवं प्रत्यक्ष लाभ अंतरण (DBT) सत्यापन</p>
+        </div>
+
+        <div class="top-actions">
+          <div class="live-clock" id="live-clock">23:25:00 • 28 Sep 2026</div>
+          <button class="btn-refresh" id="btn-refresh-data">🔄 डेटा रीफ्रेश</button>
+        </div>
+      </header>
+
+      <div class="workspace-area">
+        <!-- ==================== TAB 1: MPTAAS SCHOLARSHIP AUDIT ==================== -->
+        <section id="tab-scholarships" class="tab-pane active">
+          <!-- KPI Metrics Row -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">लंबित सत्यापन (Pending Triage)</div>
+              <div class="metric-value text-amber" id="stat-pending">14</div>
+              <div class="metric-trend">बड़वानी, धार, झाबुआ ब्लॉक</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">आज स्वीकृत सहायता राशि</div>
+              <div class="metric-value text-emerald">₹4,82,000</div>
+              <div class="metric-trend">28 पात्र छात्र-छात्राएं</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Aadhaar-NPCI विसंगति फ्लैग</div>
+              <div class="metric-value text-rose" id="stat-mismatch">6</div>
+              <div class="metric-trend">कियोस्क सुधार निर्देश प्रेषित</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">संबल 2.0 शुल्क प्रतिपूर्ति</div>
+              <div class="metric-value text-indigo">100%</div>
+              <div class="metric-trend">श्रम विभाग समन्वय सक्रिय</div>
+            </div>
+          </div>
+
+          <!-- Applications Management Table -->
+          <div class="content-box">
+            <div class="box-header">
+              <h3>लंबित छात्रवृत्ति आवेदन सूची (सत्र 2026-27)</h3>
+              <div class="filter-group">
+                <input type="text" id="search-student" placeholder="विद्यार्थी नाम या समग्र आईडी खोजें..." class="search-input">
+                <select id="filter-scheme" class="select-input">
+                  <option value="ALL">सभी योजनाएं</option>
+                  <option value="MPTAAS_ST">MPTAAS ST पोस्ट-मैट्रिक</option>
+                  <option value="SAMBAL">संबल 2.0 शिक्षा प्रोत्साहन</option>
+                  <option value="AWAS">आवास सहायता योजना</option>
+                  <option value="GAON_BETI">गाँव की बेटी योजना</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>समग्र आईडी</th>
+                    <th>विद्यार्थी नाम</th>
+                    <th>वर्ग व लिंग</th>
+                    <th>योजना</th>
+                    <th>महाविद्यालय</th>
+                    <th>ध्वज / विसंगति</th>
+                    <th>कार्रवाई</th>
+                  </tr>
+                </thead>
+                <tbody id="scholarship-table-body">
+                  <!-- Injected by renderer.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Inspection / Resolution Drawer -->
+          <div class="audit-drawer" id="audit-drawer" style="display: none;">
+            <div class="drawer-header">
+              <h4 id="drawer-student-name">विद्यार्थी आवेदन विवरण सत्यापन</h4>
+              <button class="btn-close-drawer" id="btn-close-drawer">✕ बंद करें</button>
+            </div>
+            <div class="drawer-body" id="drawer-body">
+              <!-- Injected by renderer.js -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 2: FACULTY DOUBT TRIAGE ==================== -->
+        <section id="tab-doubts" class="tab-pane">
+          <div class="faculty-workspace">
+            <div class="doubt-list-panel">
+              <div class="panel-header">
+                <h3>प्राध्यापक एस्केलेशन कतार</h3>
+                <span class="badge-amber">AI कॉन्फिडेंस &lt; 0.72</span>
+              </div>
+              <p class="panel-desc">ये वे प्रश्न हैं जिन्हें ऑन-डिवाइस व क्लाउड AI ने पेचीदा माना है और प्राध्यापक सत्यापन अनिवार्य किया है।</p>
+
+              <div class="doubt-cards" id="doubt-cards-container">
+                <!-- Injected by renderer.js -->
+              </div>
+            </div>
+
+            <div class="doubt-editor-panel">
+              <div class="panel-header">
+                <h3>प्राध्यापक उत्तर एवं संदर्भ संकलन</h3>
+                <span class="badge-emerald" id="editor-status">सक्रिय संपादन</span>
+              </div>
+
+              <div id="selected-doubt-meta" class="selected-doubt-meta">
+                <div class="selected-title" id="editor-doubt-title">कृपया बाईं सूची से किसी प्रश्न का चयन करें</div>
+                <div class="selected-student" id="editor-student-meta">-</div>
+              </div>
+
+              <div class="editor-form">
+                <label>अधिकृत उत्तर (हिंदी / क्षेत्रीय संदर्भ):</label>
+                <textarea id="faculty-answer-text" rows="5" placeholder="विद्यार्थी के शैक्षणिक संदेह का सटीक, सरल एवं मानक उत्तर यहाँ दर्ज करें..."></textarea>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label>मानक पाठ्यपुस्तक संदर्भ / पृष्ठ:</label>
+                    <input type="text" id="faculty-citation" placeholder="उदा. बरकतउल्ला वि.वि. इतिहास प्रथम वर्ष, पृष्ठ संख्या 38">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>सत्यापनकर्ता प्राध्यापक:</label>
+                    <input type="text" id="faculty-name" value="डॉ. आर. के. शर्मा (विभागाध्यक्ष - इतिहास)">
+                  </div>
+                </div>
+
+                <div class="editor-actions">
+                  <button class="btn-primary" id="btn-submit-resolution">
+                    ✓ अनुमोदित उत्तर जारी करें (2G आउटबॉक्स सिंक)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 3: .VSMP COMPILER STUDIO ==================== -->
+        <section id="tab-compiler" class="tab-pane">
+          <div class="compiler-workspace">
+            <div class="compiler-left">
+              <div class="content-box">
+                <div class="box-header">
+                  <h3>पाठ्यक्रम मॉड्यूल पैकेजिंग विनिर्देश (.vsmp)</h3>
+                  <span class="badge-blue">1.8 MB सख्त बजट</span>
+                </div>
+                <p class="box-desc">
+                  ऑडियो-स्लाइड माइक्रो-पैक (.vsmp) कंपाइलर 14 kbps ऑपस ऑडियो, डी-डुप्लिकेटेड वेक्टर कैनवास और 5 क्षेत्रीय बोलियों के टेक्स्ट को ब्रोटली स्तर-6 में संपीड़ित करता है।
+                </p>
+
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>विश्वविद्यालय:</label>
+                    <select id="comp-univ" class="select-input">
+                      <option>बरकतउल्ला विश्वविद्यालय, भोपाल</option>
+                      <option>देवी अहिल्या विश्वविद्यालय, इंदौर</option>
+                      <option>रानी दुर्गावती विश्वविद्यालय, जबलपुर</option>
+                      <option>इन्दिरा गाँधी राष्ट्रीय जनजातीय विश्वविद्यालय, अमरकंटक</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>संकाय एवं कक्षा:</label>
+                    <input type="text" id="comp-degree" class="input-text" value="B.A. (कला संकाय) - प्रथम वर्ष">
+                  </div>
+                  <div class="form-group">
+                    <label>विषय एवं अध्याय कोड:</label>
+                    <input type="text" id="comp-subject" class="input-text" value="HIST_UG_MOD_01 (सिंधु घाटी सभ्यता)">
+                  </div>
+                  <div class="form-group">
+                    <label>व्याख्यान प्रारूप (Lecture Format):</label>
+                    <select id="comp-format" class="select-input">
+                      <option value="AUDIO_SLIDE">🎧 ऑडियो-स्लाइड (.vsmp मानक 1.8 MB - 0 kbps)</option>
+                      <option value="VIDEO_240P">🎬 वीडियो व्याख्यान (H.264 240p संपीड़ित - 14 MB)</option>
+                      <option value="HYBRID">⚡ हाइब्रिड (ऑडियो-स्लाइड + वैकल्पिक वीडियो डाउनलोड)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>ऑडियो / वीडियो बिटरेट एनकोडिंग:</label>
+                    <select id="comp-bitrate" class="select-input">
+                      <option>Opus Mono @ 14 kbps (मानक - 1.8 MB कुल)</option>
+                      <option>H.264 AVC @ 120 kbps (240p वीडियो - 14.2 MB)</option>
+                      <option>Opus Mono @ 12 kbps (अल्ट्रा-लो - 1.4 MB)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group mt-12">
+                  <label>वेक्टर स्लाइड एवं डायग्राम JSON इनपुट:</label>
+                  <textarea id="comp-json-input" rows="7" class="code-textarea">{
+  "module_code": "BU_HIST_01",
+  "title": "सिंधु घाटी सभ्यता की नगर योजना एवं जल प्रबंधन",
+  "slides_count": 6,
+  "canvas_vector_elements": 48,
+  "transcripts": ["hi", "nim", "mal", "bun", "bhi"],
+  "quiz_questions": 3
+}</textarea>
+                </div>
+
+                <div class="compiler-actions">
+                  <button class="btn-compile" id="btn-run-compile">
+                    ⚡ .VSMP पैकेज कंपाइल करें एवं बजट जांचें
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="compiler-right">
+              <div class="content-box">
+                <div class="box-header">
+                  <h3>पेलोड बजट एवं संपीड़न विश्लेषण</h3>
+                  <span class="badge-emerald" id="budget-pill">बजट अनुकूल (&lt; 2.0 MB)</span>
+                </div>
+
+                <div class="payload-breakdown">
+                  <div class="breakdown-row">
+                    <span>ऑपस ऑडियो (15 मिनट @ 14 kbps):</span>
+                    <strong>1.57 MB (88.2%)</strong>
+                  </div>
+                  <div class="progress-bar-bg">
+                    <div class="progress-fill fill-audio" style="width: 88%;"></div>
+                  </div>
+
+                  <div class="breakdown-row mt-10">
+                    <span>वेक्टर कैनवास आकृतियां (JSON):</span>
+                    <strong>0.14 MB (7.8%)</strong>
+                  </div>
+                  <div class="progress-bar-bg">
+                    <div class="progress-fill fill-vector" style="width: 8%;"></div>
+                  </div>
+
+                  <div class="breakdown-row mt-10">
+                    <span>5 क्षेत्रीय भाषा ट्रांसक्रिप्ट (ब्रोटली-6):</span>
+                    <strong>0.07 MB (4.0%)</strong>
+                  </div>
+                  <div class="progress-bar-bg">
+                    <div class="progress-fill fill-text" style="width: 4%;"></div>
+                  </div>
+                </div>
+
+                <div class="total-envelope-card">
+                  <div class="envelope-label">कुल .vsmp पेलोड आकार:</div>
+                  <div class="envelope-value" id="comp-result-size">1.78 MB</div>
+                  <div class="envelope-note">40 kbps 2G पाइप पर डाउनलोड समय: <strong>3.7 मिनट</strong></div>
+                </div>
+
+                <div class="compilation-console" id="compilation-console">
+                  <div class="console-line text-slate">[READY] कंपाइलर इंजन तैयार है...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

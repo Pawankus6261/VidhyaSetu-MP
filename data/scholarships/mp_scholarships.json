@@ -1,0 +1,196 @@
+[
+  {
+    "scheme_id": "MP_ST_POST_MATRIC_2026",
+    "scheme_name": "Post-Matric Scholarship for ST Students (पोस्ट मैट्रिक छात्रवृत्ति - अजजा)",
+    "administering_department": "Tribal Affairs Department, Government of Madhya Pradesh",
+    "official_portal": "https://www.tribal.mp.gov.in/MPTAAS",
+    "financial_benefit": "100% Tuition Fee Reimbursement + ₹550/month maintenance allowance",
+    "annual_estimated_inr": 18000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "categories": ["ST"],
+      "max_family_income_inr": 250000,
+      "minimum_academic_percentage": 33.0,
+      "eligible_courses": ["BA", "BSC", "BCOM", "MA", "MSC", "MCOM", "DIPLOMA", "ITI", "PHD"]
+    },
+    "required_documents": [
+      "Samagra Member ID (9 digits)",
+      "Digital Caste Certificate (16 digits)",
+      "Current Financial Year Income Certificate / Self-Declaration",
+      "10th & 12th Marksheets",
+      "College Admission Slip (e-Pravesh Allotment)",
+      "Aadhaar-Linked Bank Account (NPCI DBT Seeded)"
+    ],
+    "verification_frequency": "Annual",
+    "last_audited_date": "2026-08-15"
+  },
+  {
+    "scheme_id": "MP_SC_POST_MATRIC_2026",
+    "scheme_name": "Post-Matric Scholarship for SC Students (पोस्ट मैट्रिक छात्रवृत्ति - अजा)",
+    "administering_department": "Scheduled Caste Welfare Department, Government of Madhya Pradesh",
+    "official_portal": "https://www.tribal.mp.gov.in/MPTAAS",
+    "financial_benefit": "100% Tuition Fee Reimbursement + Maintenance Allowance",
+    "annual_estimated_inr": 18000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "categories": ["SC"],
+      "max_family_income_inr": 250000,
+      "minimum_academic_percentage": 33.0,
+      "eligible_courses": ["BA", "BSC", "BCOM", "MA", "MSC", "MCOM", "DIPLOMA", "ITI", "PHD"]
+    },
+    "required_documents": [
+      "Samagra Member ID",
+      "Digital SC Caste Certificate",
+      "Income Certificate (< ₹2.5 Lakh/yr)",
+      "10th & 12th Marksheets",
+      "College Admission Slip",
+      "NPCI Seeded Bank Account"
+    ],
+    "verification_frequency": "Annual",
+    "last_audited_date": "2026-08-15"
+  },
+  {
+    "scheme_id": "MP_OBC_POST_MATRIC_2026",
+    "scheme_name": "Post-Matric Scholarship for OBC Students (अन्य पिछड़ा वर्ग छात्रवृत्ति)",
+    "administering_department": "Backward Classes & Minorities Welfare Department, MP",
+    "official_portal": "https://scholarshipportal.mp.nic.in",
+    "financial_benefit": "100% Govt Tuition Fee + Maintenance Allowance",
+    "annual_estimated_inr": 14000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "categories": ["OBC"],
+      "max_family_income_inr": 300000,
+      "minimum_academic_percentage": 33.0,
+      "eligible_courses": ["BA", "BSC", "BCOM", "MA", "MSC", "MCOM", "DIPLOMA", "ITI"]
+    },
+    "required_documents": [
+      "Samagra Member ID",
+      "Non-Creamy Layer OBC Certificate",
+      "Valid Income Certificate (< ₹3 Lakh)",
+      "College Admission Fee Receipt"
+    ],
+    "verification_frequency": "Annual",
+    "last_audited_date": "2026-08-15"
+  },
+  {
+    "scheme_id": "MP_SAMBAL_SHIKSHA_PROTSAHAN_2026",
+    "scheme_name": "Mukhyamantri Jan Kalyan Shiksha Protsahan Yojana (संबल 2.0 शिक्षा प्रोत्साहन)",
+    "administering_department": "Labour Department & Higher Education Department, Govt of MP",
+    "official_portal": "https://medhavikalyan.mp.gov.in",
+    "financial_benefit": "100% Full Admission & Tuition Fee Waiver in Govt & Aided Colleges",
+    "annual_estimated_inr": 25000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "categories": ["ST", "SC", "OBC", "GEN"],
+      "parent_sambal_card_required": true,
+      "parent_occupation": "Registered Unorganized Laborer (असंगठित कर्मकार)",
+      "minimum_academic_percentage": 33.0,
+      "eligible_courses": ["BA", "BSC", "BCOM", "MA", "MSC", "MCOM", "BE", "MBBS", "POLYTECHNIC", "ITI"]
+    },
+    "required_documents": [
+      "Parent's Valid Sambal 2.0 Registration Number",
+      "Samagra Family & Member ID",
+      "10th & 12th Marksheets",
+      "College Admission Allotment Letter",
+      "Bank Account Details"
+    ],
+    "verification_frequency": "Annual",
+    "last_audited_date": "2026-08-15"
+  },
+  {
+    "scheme_id": "MP_AWAS_SAHAYATA_2026",
+    "scheme_name": "Awas Sahayata Yojana for SC/ST (आवास सहायता योजना)",
+    "administering_department": "Tribal Affairs & Scheduled Caste Welfare Department, MP",
+    "official_portal": "https://www.tribal.mp.gov.in/MPTAAS",
+    "financial_benefit": "₹1,000/mo (Tehsil town), ₹1,500/mo (District HQ), ₹2,000/mo (Divisional City)",
+    "annual_estimated_inr": 15000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "categories": ["ST", "SC"],
+      "residence_condition": "Must be residing in rented accommodation due to non-availability of Govt Hostel",
+      "min_distance_from_home_km": 10.0,
+      "eligible_courses": ["BA", "BSC", "BCOM", "MA", "MSC", "MCOM", "DIPLOMA", "ITI"]
+    },
+    "required_documents": [
+      "Rent Agreement with Landlord",
+      "Landlord's Samagra ID / Electricity Bill",
+      "College Principal Certificate verifying hostel non-allotment",
+      "Bank Account Details"
+    ],
+    "verification_frequency": "Bi-annual",
+    "last_audited_date": "2026-08-15"
+  },
+  {
+    "scheme_id": "MP_GAON_KI_BETI_2026",
+    "scheme_name": "Gaon Ki Beti Yojana (गाँव की बेटी योजना)",
+    "administering_department": "Higher Education Department, Government of Madhya Pradesh",
+    "official_portal": "https://scholarshipportal.mp.nic.in",
+    "financial_benefit": "₹500/month for 10 months (₹5,000 per academic year)",
+    "annual_estimated_inr": 5000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "gender": ["FEMALE"],
+      "residence_type": ["RURAL"],
+      "minimum_academic_percentage": 60.0,
+      "qualifying_exam": "12th Standard from a Rural School",
+      "eligible_courses": ["BA", "BSC", "BCOM", "MA", "MSC", "MCOM"]
+    },
+    "required_documents": [
+      "Gram Panchayat Certificate (Certifying rural village residence)",
+      "12th Marksheet with >= 60%",
+      "Samagra Member ID",
+      "College Admission Slip",
+      "Bank Passbook Copy"
+    ],
+    "verification_frequency": "Annual",
+    "last_audited_date": "2026-08-15"
+  },
+  {
+    "scheme_id": "MP_PRATIBHA_KIRAN_2026",
+    "scheme_name": "Pratibha Kiran Yojana (प्रतिभा किरण योजना - शहरी बीपीएल छात्राएं)",
+    "administering_department": "Higher Education Department, Government of Madhya Pradesh",
+    "official_portal": "https://scholarshipportal.mp.nic.in",
+    "financial_benefit": "₹500/month for 10 months (₹5,000 per academic year)",
+    "annual_estimated_inr": 5000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "gender": ["FEMALE"],
+      "residence_type": ["URBAN"],
+      "bpl_status_required": true,
+      "minimum_academic_percentage": 60.0,
+      "eligible_courses": ["BA", "BSC", "BCOM"]
+    },
+    "required_documents": [
+      "Urban BPL Ration Card / Certificate",
+      "12th Marksheet with >= 60%",
+      "Samagra Member ID",
+      "Bank Account Details"
+    ],
+    "verification_frequency": "Annual",
+    "last_audited_date": "2026-08-15"
+  },
+  {
+    "scheme_id": "MP_MMVY_2026",
+    "scheme_name": "Mukhyamantri Medhavi Vidyarthi Yojana (MMVY - मेधावी विद्यार्थी योजना)",
+    "administering_department": "Technical Education & Higher Education Department, Govt of MP",
+    "official_portal": "https://scholarshipportal.mp.nic.in/MedhaviChhatra",
+    "financial_benefit": "100% Full Tuition Fee Reimbursement across Govt & Private Recognized Institutions",
+    "annual_estimated_inr": 35000,
+    "eligibility_rules": {
+      "domicile": ["MP"],
+      "max_family_income_inr": 600000,
+      "minimum_academic_percentage": 70.0,
+      "board_specific_rule": "70% for MP Board or 85% for CBSE/ICSE in 12th Standard",
+      "eligible_courses": ["BA", "BSC", "BCOM", "BE", "BTECH", "MBBS", "LLB"]
+    },
+    "required_documents": [
+      "12th Marksheet showing 70%+ (MP Board) or 85%+ (CBSE)",
+      "Tehsildar-Issued Income Certificate (< ₹6 Lakh/yr)",
+      "MP Domicile Certificate",
+      "Samagra Member ID",
+      "College Fee Receipt"
+    ],
+    "verification_frequency": "Annual",
+    "last_audited_date": "2026-08-15"
+  }
+]

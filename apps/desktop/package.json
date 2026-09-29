@@ -1,0 +1,24 @@
+{
+  "name": "vidyasetu-mp-desktop",
+  "version": "1.0.0",
+  "description": "VidyaSetu MP Nodal Officer & Faculty Command Studio - Desktop Application for Madhya Pradesh Higher Education",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "keywords": [
+    "vidyasetu",
+    "mponline",
+    "mptaas",
+    "electron",
+    "higher-education",
+    "offline-first"
+  ],
+  "author": "VidyaSetu MP Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}
