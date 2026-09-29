@@ -72,3 +72,15 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+
+# Python & Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite
+*.sqlite3
+*.db
+backend/storage/
+backend/vidyasetu_mp.db
+.pytest_cache/
+
